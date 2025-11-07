@@ -23,6 +23,7 @@ const encoder = (str: string) => {
     .filter((token) => token.length > 0)
 }
 
+// 在这里配置分词器
 let index = new FlexSearch.Document<Item>({
   encode: encoder,
   document: {
@@ -31,15 +32,15 @@ let index = new FlexSearch.Document<Item>({
     index: [
       {
         field: "title",
-        tokenize: "forward",
+        tokenize: "full",
       },
       {
         field: "content",
-        tokenize: "forward",
+        tokenize: "full",
       },
       {
         field: "tags",
-        tokenize: "forward",
+        tokenize: "full",
       },
     ],
   },
