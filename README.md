@@ -9,10 +9,22 @@ Quartz v4 features a from-the-ground rewrite focusing on end-user extensibility 
 
 [Join the Discord Community](https://discord.gg/cRFFHYye7t)
 
-## Sponsors
+## 安装说明
 
-<p align="center">
-  <a href="https://github.com/sponsors/jackyzha0">
-    <img src="https://cdn.jsdelivr.net/gh/jackyzha0/jackyzha0/sponsorkit/sponsors.svg" />
-  </a>
-</p>
+环境：
+具体不清楚，反正nodejs22可用。
+
+初始化项目：
+
+执行
+
+```bash
+npm install
+```
+
+然后
+
+```bash
+npx quartz build --serve
+```
+
