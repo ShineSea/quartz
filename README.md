@@ -18,5 +18,5 @@ Quartz v4 features a from-the-ground rewrite focusing on end-user extensibility 
 </p>
 
 
-
+npx quartz build --serve --port 8081
 npx quartz sync
