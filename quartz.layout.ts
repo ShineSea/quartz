@@ -23,6 +23,7 @@ export const defaultContentPageLayout: PageLayout = {
     }),
     Component.ArticleTitle(),
     Component.ContentMeta(),
+    Component.CustomMeta(), // 添加自定义元数据组件
     Component.TagList(),
   ],
   left: [
