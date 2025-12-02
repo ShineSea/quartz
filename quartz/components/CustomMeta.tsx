@@ -89,21 +89,23 @@ const CustomMeta: QuartzComponent = ({ fileData, displayClass, cfg }: QuartzComp
   return (
     <div class={classNames(displayClass, "custom-meta")}>
       <h3>Metadata</h3>
-      <dl class="custom-meta-list">
-        {customFields.map(field => {
-          const value = frontmatter[field]
-          // 只渲染非空值
-          if (value !== undefined && value !== null && value !== '') {
-            return (
-              <>
-                <dt class="custom-meta-key">{field.replace(/_/g, ' ')}</dt>
-                <dd class="custom-meta-value">{renderValue(value)}</dd>
-              </>
-            )
-          }
-          return null
-        })}
-      </dl>
+      <table class="custom-meta-table">
+        <tbody>
+          {customFields.map(field => {
+            const value = frontmatter[field]
+            // 只渲染非空值
+            if (value !== undefined && value !== null && value !== '') {
+              return (
+                <tr key={field}>
+                  <td class="custom-meta-key">{field.replace(/_/g, ' ')}</td>
+                  <td class="custom-meta-value">{renderValue(value)}</td>
+                </tr>
+              )
+            }
+            return null
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -122,18 +124,35 @@ CustomMeta.css = `
   margin-bottom: 0.5rem;
 }
 
-.custom-meta-list {
-  margin: 0;
-  padding-left: 1rem;
+.custom-meta-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
 .custom-meta-key {
   font-weight: bold;
-  margin-top: 0.5rem;
+  width: 120px; /* 固定键列宽度 */
+  vertical-align: top;
+  padding: 0.25rem 0.5rem 0.25rem 0;
+  border-right: 1px solid var(--gray);
 }
 
 .custom-meta-value {
-  margin-left: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  vertical-align: top;
+}
+
+.custom-meta-table tr:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.custom-meta-table tr:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.custom-meta-list {
+  margin: 0;
+  padding-left: 1rem;
 }
 
 .custom-meta-list ul {
