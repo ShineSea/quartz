@@ -59,7 +59,11 @@ function extractWikiLinks(value: string): string[] {
   let match
   
   while ((match = wikilinkRegex.exec(value)) !== null) {
-    links.push(match[1])
+    // 处理带别名的链接格式 [[path/to/file|title]]
+    const linkPart = match[1]
+    const pipeIndex = linkPart.indexOf('|')
+    const actualLink = pipeIndex !== -1 ? linkPart.substring(0, pipeIndex) : linkPart
+    links.push(actualLink)
   }
   
   return links
