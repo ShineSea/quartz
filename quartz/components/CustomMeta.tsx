@@ -58,12 +58,17 @@ const CustomMeta: QuartzComponent = ({ fileData, displayClass, cfg }: QuartzComp
             {parts.map((part, index) => {
               if (index % 2 === 1) {
                 // 这是链接内容
+                // 处理带别名的链接格式 [[path/to/file|title]]
+                const pipeIndex = part.indexOf('|')
+                const actualLink = pipeIndex !== -1 ? part.substring(0, pipeIndex) : part
+                const linkText = pipeIndex !== -1 ? part.substring(pipeIndex + 1) : part
+                
                 // 使用 slugifyFilePath 来正确处理文件名
-                const slugified = slugifyFilePath(`${part}.md` as FilePath)
+                const slugified = slugifyFilePath(`${actualLink}.md` as FilePath)
                 const linkDest = resolveRelative(fileData.slug!, slugified)
                 return (
                   <a href={linkDest} class="internal">
-                    {part}
+                    {linkText}
                   </a>
                 )
               } else {
@@ -88,7 +93,7 @@ const CustomMeta: QuartzComponent = ({ fileData, displayClass, cfg }: QuartzComp
 
   return (
     <div class={classNames(displayClass, "custom-meta")}>
-      <h3>Metadata</h3>
+      <h3>笔记元数据</h3>
       <table class="custom-meta-table">
         <tbody>
           {customFields.map(field => {
