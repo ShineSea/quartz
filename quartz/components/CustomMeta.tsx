@@ -93,7 +93,7 @@ const CustomMeta: QuartzComponent = ({ fileData, displayClass, cfg }: QuartzComp
 
   return (
     <div class={classNames(displayClass, "custom-meta")}>
-      <h3>笔记元数据</h3>
+      {/* <h3>笔记元数据</h3> */}
       <table class="custom-meta-table">
         <tbody>
           {customFields.map(field => {
