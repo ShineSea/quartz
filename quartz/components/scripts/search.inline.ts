@@ -49,7 +49,8 @@ let index = new FlexSearch.Document<Item>({
 const p = new DOMParser()
 const fetchContentCache: Map<FullSlug, Element[]> = new Map()
 const contextWindowWords = 30
-const numSearchResults = 8
+// 当numSearchResults配置较小时，可能出现搜索结果不全；当其配置较大时，
+const numSearchResults = 40
 const numTagResults = 5
 
 const tokenizeTerm = (term: string) => {

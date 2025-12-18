@@ -28,3 +28,27 @@ npm install
 npx quartz build --serve
 ```
 
+## pm2守护
+
+1、在项目根目录创建`logs`文件夹
+
+```powershell
+New-Item -ItemType Directory -Force -Path .\logs
+```
+
+2、启动 PM2：
+```powershell
+pm2 start ecosystem.config.cjs
+```
+
+3、查看状态：
+```powershell
+pm2 status
+pm2 logs my-quartz
+```
+
+4、停止/重启：
+```powershell
+pm2 stop my-quartz
+pm2 restart my-quartz
+```

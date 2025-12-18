@@ -12,3 +12,4 @@ replit.nix
 .content
 .content_backup
 /content
+/logs
