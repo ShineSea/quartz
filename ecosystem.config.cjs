@@ -2,7 +2,7 @@ module.exports = {
   apps: [{
     name: "my-quartz",
     script: "./quartz/bootstrap-cli.mjs",
-    args: "build --serve",
+    args: "build --serve --port 8765",
     interpreter: "node",
     interpreter_args: "--no-deprecation",
     // 与 bootstrap-cli.mjs 第一行的 shebang #!/usr/bin/env -S node --no-deprecation 保持一致
@@ -11,7 +11,7 @@ module.exports = {
     env: {
       NODE_ENV: "production",
     },
-    
+
     // 日志配置
     error_file: "./logs/quartz-error.log",
     out_file: "./logs/quartz-out.log",
