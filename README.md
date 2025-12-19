@@ -1,14 +1,5 @@
 # Quartz v4
 
-> “[One] who works with the door open gets all kinds of interruptions, but [they] also occasionally gets clues as to what the world is and what might be important.” — Richard Hamming
-
-Quartz is a set of tools that helps you publish your [digital garden](https://jzhao.xyz/posts/networked-thought) and notes as a website for free.
-Quartz v4 features a from-the-ground rewrite focusing on end-user extensibility and ease-of-use.
-
-🔗 Read the documentation and get started: https://quartz.jzhao.xyz/
-
-[Join the Discord Community](https://discord.gg/cRFFHYye7t)
-
 ## 安装说明
 
 环境：
@@ -30,6 +21,8 @@ npx quartz build --serve
 
 ## pm2守护
 
+https://pm2.node.org.cn/docs/usage/quick-start/
+
 1、在项目根目录创建`logs`文件夹
 
 ```powershell
@@ -44,11 +37,113 @@ pm2 start ecosystem.config.cjs
 3、查看状态：
 ```powershell
 pm2 status
-pm2 logs my-quartz
 ```
+
+
 
 4、停止/重启：
 ```powershell
 pm2 stop my-quartz
 pm2 restart my-quartz
+```
+
+### PM2日志
+
+https://pm2.node.org.cn/docs/usage/log-management/
+
+查看日志：
+```
+pm2 logs my-quartz
+```
+
+#### PM2日志轮转管理
+
+https://github.com/keymetrics/pm2-logrotate#configure
+
+安装：
+```
+pm2 install pm2-logrotate
+```
+
+日志轮转配置文件在 `C:\Users\你的用户名\.pm2\module_conf.json`。
+
+
+基础设置：
+```
+pm2 set pm2-logrotate:max_size 60M;
+pm2 set pm2-logrotate:retain 30;
+pm2 set pm2-logrotate:dateFormat YYYY-MM-DD;
+pm2 set pm2-logrotate:rotateInterval '0 0 * * *';
+pm2 set pm2-logrotate:compress true;
+pm2 set pm2-logrotate:workerInterval 60;
+```
+
+验证配置：
+
+```bash
+pm2 conf
+```
+
+查看单个配置：
+
+```bash
+pm2 get pm2-logrotate:max_size
+pm2 get pm2-logrotate:retain
+```
+
+### PM2 命令清单
+
+查看配置
+
+```owershell
+pm2 conf  # 查看 pm2-logrotate 配置
+```
+
+查看日志
+
+```powershell
+# 实时查看日志（带时间戳）
+pm2 logs my-quartz
+
+# 查看最近 50 行
+pm2 logs my-quartz --lines 50
+
+# 不实时滚动，只看一次
+pm2 logs my-quartz --lines 20 --nostream
+
+# 只看错误日志
+pm2 logs my-quartz --err
+
+# 只看标准输出
+pm2 logs my-quartz --out
+```
+
+管理服务
+
+```powershell
+# 查看状态（包括内存使用）
+pm2 status
+
+# 实时监控（CPU + 内存）
+pm2 monit
+
+# 重启服务
+pm2 restart my-quartz
+
+# 停止服务
+pm2 stop my-quartz
+
+# 清空日志
+pm2 flush my-quartz
+```
+
+日志轮转管理
+
+```powershell
+# 手动触发日志轮转
+pm2 trigger pm2-logrotate rotate
+
+# 修改配置（示例）
+pm2 set pm2-logrotate:max_size 100M  # 改为 100MB
+pm2 set pm2-logrotate:retain 60      # 保留 60 个文件
 ```
