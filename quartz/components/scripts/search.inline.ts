@@ -17,15 +17,21 @@ type SearchType = "basic" | "tags"
 let searchType: SearchType = "basic"
 let currentSearchTerm: string = ""
 const encoder = (str: string): string[] => {
+  // 最终返回的token数组
   const tokens: string[] = []
+  // -1表示"当前没有正在处理的英文单词"
   let bufferStart = -1
   let bufferEnd = -1
+  // 转小写,实现大小写不敏感
   const lower = str.toLowerCase()
 
-  let i = 0
+  // 字符串索引位置
+  let i = 0 
   for (const char of lower) {
+    // 获取Unicode码点
     const code = char.codePointAt(0)!
 
+    // ========== 第一步:判断字符类型 ==========
     const isCJK =
       (code >= 0x3040 && code <= 0x309f) ||
       (code >= 0x30a0 && code <= 0x30ff) ||
@@ -33,28 +39,48 @@ const encoder = (str: string): string[] => {
       (code >= 0xac00 && code <= 0xd7af) ||
       (code >= 0x20000 && code <= 0x2a6df)
 
-    const isWhitespace = code === 32 || code === 9 || code === 10 || code === 13
+    const isWhitespace =
+      code === 32 || // 空格
+      code === 9 || // Tab
+      code === 10 || // 换行\n
+      code === 13 // 回车\r
 
+    // ========== 第二步:根据字符类型处理 ==========
     if (isCJK) {
+      // 情况1: 遇到中文字符
       if (bufferStart !== -1) {
+        // 如果之前正在处理英文单词,先输出它
         tokens.push(lower.slice(bufferStart, bufferEnd))
+        // 重置buffer
         bufferStart = -1
       }
+      // 中文字符直接作为独立token
       tokens.push(char)
     } else if (isWhitespace) {
+      // 情况2: 遇到空格
       if (bufferStart !== -1) {
+        // 如果之前正在处理英文单词,输出它
         tokens.push(lower.slice(bufferStart, bufferEnd))
+        // 重置buffer
         bufferStart = -1
       }
+      // 空格本身不作为token
     } else {
-      if (bufferStart === -1) bufferStart = i
+      // 情况3: 遇到英文字符或其他字符
+      if (bufferStart === -1) {
+        // 如果是英文单词的第一个字符,记录起始位置
+        bufferStart = i
+      }
+      // 更新结束位置
       bufferEnd = i + char.length
     }
-
+    // 移动索引(处理emoji等多字节字符)
     i += char.length
   }
 
+  // ========== 第三步:处理剩余的buffer ==========
   if (bufferStart !== -1) {
+    // 如果最后还有未输出的英文单词,输出它
     tokens.push(lower.slice(bufferStart))
   }
 
