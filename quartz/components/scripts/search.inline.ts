@@ -463,6 +463,19 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
     highlights[0]?.scrollIntoView({ block: "start" })
   }
 
+  // 检查文档是否包含所有必需的搜索词/短语
+  function matchesAllTerms(text: string, searchTerms: string[]): boolean {
+    const lowerText = text.toLowerCase()
+    return searchTerms.every(term => lowerText.includes(term.toLowerCase()))
+  }
+
+  // 将搜索词分解为必需的terms
+  function extractRequiredTerms(searchTerm: string): string[] {
+    // 按空格分割，得到独立的词或短语
+    const parts = searchTerm.trim().split(/\s+/)
+    return parts.filter(p => p.length > 0)
+  }
+
   async function onType(e: HTMLElementEventMap["input"]) {
     if (!searchLayout || !index) return
     currentSearchTerm = (e.target as HTMLInputElement).value
@@ -501,7 +514,9 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
     } else if (searchType === "basic") {
       searchResults = await index.searchAsync({
         query: currentSearchTerm,
-        limit: numSearchResults,
+        // limit: numSearchResults,
+        // 增加limit以便后续过滤
+        limit: Math.max(numSearchResults * 3, 30),
         index: ["title", "content"],
       })
     }
@@ -517,7 +532,26 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
       ...getByField("content"),
       ...getByField("tags"),
     ])
-    const finalResults = [...allIds].map((id) => formatForDisplay(currentSearchTerm, id))
+    
+    // const finalResults = [...allIds].map((id) => formatForDisplay(currentSearchTerm, id))
+
+    // --- 过滤结果 ---
+
+    // 提取必需的搜索词
+    const requiredTerms = extractRequiredTerms(currentSearchTerm)
+    
+    // 过滤结果：只保留包含所有必需词的文档
+    const filteredIds = [...allIds].filter((id) => {
+      const slug = idDataMap[id]
+      const doc = data[slug]
+      const combinedText = `${doc.title ?? ""} ${doc.content ?? ""}`
+      return matchesAllTerms(combinedText, requiredTerms)
+    })
+    
+    // 限制最终结果数量
+    const finalResults = filteredIds
+      .slice(0, numSearchResults)
+      .map((id) => formatForDisplay(currentSearchTerm, id))
     await displayResults(finalResults)
   }
 

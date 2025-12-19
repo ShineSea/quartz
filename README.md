@@ -16,7 +16,7 @@ npm install
 然后
 
 ```bash
-npx quartz build --serve
+npx quartz build --serve --port 8765
 ```
 
 ## pm2守护
