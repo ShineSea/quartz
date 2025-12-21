@@ -13,6 +13,7 @@ import Spacer from "./Spacer"
 import TableOfContents from "./TableOfContents"
 import TableOfContents2 from "./TableOfContents2"
 import Explorer from "./Explorer"
+import Explorer2 from "./Explorer2"
 import TagList from "./TagList"
 import Graph from "./Graph"
 import Backlinks from "./Backlinks"
@@ -42,6 +43,7 @@ export {
   TableOfContents,
   TableOfContents2,
   Explorer,
+  Explorer2,
   TagList,
   Graph,
   Backlinks,
