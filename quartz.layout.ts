@@ -26,6 +26,19 @@ export const defaultContentPageLayout: PageLayout = {
     Component.ContentMeta(),
     Component.CustomMeta(), // 添加自定义元数据组件
     Component.TagList(),
+    // 在首页显示自定义 Homepage 组件
+    Component.ConditionalRender({
+      component: Component.Homepage({
+        // 可选配置：指定要显示的一级目录（留空则显示全部）
+        // topFolders: ["技术", "笔记", "项目"],
+        // 可选配置：指定要显示的常用标签（留空则显示全部）
+        // featuredTags: ["JavaScript", "Python", "React"],
+        showFolderCount: true,
+        foldersTitle: "📂 探索内容",
+        tagsTitle: "🏷️ 常用标签",
+      }),
+      condition: (page) => page.fileData.slug === "index",
+    }),
   ],
   left: [
     Component.PageTitle(),

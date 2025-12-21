@@ -1,0 +1,163 @@
+@use "../../styles/variables.scss" as *;
+
+.homepage-container {
+  width: 100%;
+  padding: 2rem 0;
+}
+
+.homepage-section {
+  margin-bottom: 3rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.homepage-section-title {
+  font-size: 1.75rem;
+  font-weight: $boldWeight;
+  margin-bottom: 1.5rem;
+  color: var(--dark);
+  font-family: var(--headerFont);
+  
+  @media #{$mobile} {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+  }
+}
+
+/* 文件夹卡片样式 */
+.folder-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.25rem;
+  
+  @media #{$mobile} {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+.folder-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--homepage-card-padding);
+  background: var(--light);
+  border: var(--homepage-card-border);
+  border-radius: var(--homepage-card-border-radius);
+  box-shadow: var(--homepage-card-shadow);
+  text-decoration: none;
+  transition: all 0.25s ease;
+  
+  &:hover {
+    transform: var(--homepage-card-hover-transform);
+    box-shadow: var(--homepage-card-hover-shadow);
+    border-color: var(--secondary);
+    background: var(--highlight);
+    
+    .folder-card-icon svg {
+      stroke: var(--secondary);
+      transform: scale(1.05);
+    }
+  }
+
+  @media #{$mobile} {
+    padding: 1.5rem 1rem;
+  }
+}
+
+.folder-card-icon {
+  margin-bottom: 1rem;
+  
+  svg {
+    stroke: var(--tertiary);
+    transition: all 0.25s ease;
+  }
+}
+
+.folder-card-content {
+  text-align: center;
+  width: 100%;
+}
+
+.folder-card-title {
+  font-size: 1.25rem;
+  font-weight: $semiBoldWeight;
+  color: var(--dark);
+  margin: 0 0 0.5rem 0;
+  font-family: var(--headerFont);
+  
+  @media #{$mobile} {
+    font-size: 1.1rem;
+  }
+}
+
+.folder-card-count {
+  font-size: 0.9rem;
+  color: var(--gray);
+  margin: 0;
+}
+
+/* 标签云样式 */
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  
+  @media #{$mobile} {
+    gap: 0.6rem;
+  }
+}
+
+.tag-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: var(--homepage-tag-padding);
+  background: var(--highlight);
+  border-radius: var(--homepage-tag-border-radius);
+  border: var(--homepage-tag-border);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: var(--lightgray);
+    border-color: var(--secondary);
+    transform: translateY(-2px);
+  }
+
+  @media #{$mobile} {
+    padding: 0.4rem 0.8rem;
+  }
+}
+
+.tag-name {
+  font-size: 0.9rem;
+  font-weight: $normalWeight;
+  color: var(--dark);
+  
+  @media #{$mobile} {
+    font-size: 0.85rem;
+  }
+}
+
+.tag-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--homepage-tag-count-size);
+  height: var(--homepage-tag-count-size);
+  padding: 0 0.35rem;
+  background: var(--lightgray);
+  border-radius: var(--homepage-tag-count-border-radius);
+  font-size: 0.75rem;
+  font-weight: $semiBoldWeight;
+  color: var(--gray);
+  
+  @media #{$mobile} {
+    min-width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
+  }
+}

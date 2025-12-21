@@ -1,7 +1,7 @@
 import { QuartzConfig } from "./quartz/cfg"
 import * as Plugin from "./quartz/plugins"
-import { colorThemes } from "./quartz/themes/colors"
-import { styleThemes } from "./quartz/themes/styles"
+import { defaultColors, deepOceanColors, inkEleganceColors } from "./quartz/themes"
+import { defaultStyle, cardStyle, minimalStyle } from "./quartz/themes"
 
 /**
  * Quartz 4 Configuration
@@ -19,7 +19,7 @@ const config: QuartzConfig = {
     },
     locale: "zh-CN",
     baseUrl: "quartz.jzhao.xyz",
-    ignorePatterns: ["private", "templates", ".obsidian", "journals"],
+    ignorePatterns: ["private", "templates", ".obsidian", "journals", "assets"],
     defaultDateType: "modified",
     theme: {
       fontOrigin: "googleFonts",
@@ -29,12 +29,12 @@ const config: QuartzConfig = {
         body: "Source Sans Pro",
         code: "IBM Plex Mono",
       },
-      // 🎨 颜色主题 - 可选值: default, deepOcean, inkElegance
-      // 在 quartz/themes/colors/index.ts 中查看所有可用主题
-      colors: colorThemes.default,
-      // 🎯 样式主题 - 可选值: default, card, minimal
-      // 在 quartz/themes/styles/index.ts 中查看所有可用样式
-      styles: styleThemes.minimal,
+      // 🎨 颜色主题 - 可选值: defaultColors, deepOceanColors, inkEleganceColors
+      // 在 quartz/themes/colors/ 中查看所有可用主题
+      colors: defaultColors,
+      // 🎯 样式主题 - 可选值: defaultStyle, cardStyle, minimalStyle
+      // 在 quartz/themes/styles/ 中查看所有可用样式
+      styles: cardStyle,
     },
   },
   plugins: {

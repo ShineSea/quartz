@@ -72,7 +72,7 @@ export default {
     },
     folderContent: {
       folder: "文件夹",
-      itemsUnderFolder: ({ count }) => `此文件夹下有${count}条笔记。`,
+      itemsUnderFolder: ({ count }) => `此文件夹下有${count}项。`,
     },
     tagContent: {
       tag: "标签",

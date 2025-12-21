@@ -187,6 +187,20 @@ ${stylesheet.join("\n\n")}
   --meta-key-font-weight: ${styles.customMeta.keyFontWeight};
   --meta-row-hover-opacity: ${styles.customMeta.rowHoverOpacity};
   --meta-striped-opacity: ${styles.customMeta.stripedRowOpacity};
+  
+  /* Homepage 首页样式变量 */
+  --homepage-card-padding: ${styles.homepage.cardPadding};
+  --homepage-card-border-radius: ${styles.homepage.cardBorderRadius};
+  --homepage-card-border: ${styles.homepage.cardBorder};
+  --homepage-card-shadow: ${styles.homepage.cardShadow};
+  --homepage-card-hover-transform: ${styles.homepage.cardHoverTransform};
+  --homepage-card-hover-shadow: ${styles.homepage.cardHoverShadow};
+  
+  --homepage-tag-padding: ${styles.homepage.tagPadding};
+  --homepage-tag-border-radius: ${styles.homepage.tagBorderRadius};
+  --homepage-tag-border: ${styles.homepage.tagBorder};
+  --homepage-tag-count-size: ${styles.homepage.tagCountSize};
+  --homepage-tag-count-border-radius: ${styles.homepage.tagCountBorderRadius};
   ` : ''}
 }
 
