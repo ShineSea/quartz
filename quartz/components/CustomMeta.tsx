@@ -148,6 +148,10 @@ CustomMeta.css = `
 .custom-meta-value {
   padding: 0.25rem 0.5rem;
   vertical-align: top;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 0;
 }
 
 .custom-meta-table tr:nth-child(even) {
