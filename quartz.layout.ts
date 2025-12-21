@@ -57,7 +57,9 @@ export const defaultContentPageLayout: PageLayout = {
   ],
   right: [
     Component.Graph(),
-    Component.DesktopOnly(Component.TableOfContents()),
+    Component.DesktopOnly(Component.TableOfContents2({
+      collapseByDefault: true, // 默认折叠子级标题
+    })),
     Component.Backlinks(),
   ],
 }

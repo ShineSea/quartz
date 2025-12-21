@@ -11,6 +11,7 @@ import ContentMeta from "./ContentMeta"
 import CustomMeta from "./CustomMeta" // 添加自定义元数据组件
 import Spacer from "./Spacer"
 import TableOfContents from "./TableOfContents"
+import TableOfContents2 from "./TableOfContents2"
 import Explorer from "./Explorer"
 import TagList from "./TagList"
 import Graph from "./Graph"
@@ -39,6 +40,7 @@ export {
   CustomMeta, // 导出自定义元数据组件
   Spacer,
   TableOfContents,
+  TableOfContents2,
   Explorer,
   TagList,
   Graph,
