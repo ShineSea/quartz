@@ -62,7 +62,9 @@ export const defaultContentPageLayout: PageLayout = {
     Component.DesktopOnly(Component.TableOfContents2({
       collapseByDefault: true, // 默认折叠子级标题
     })),
-    Component.Backlinks(),
+    Component.Backlinks({
+      hideWhenEmpty: false,  // 即使没有反向链接也显示
+    }),
   ],
 }
 
