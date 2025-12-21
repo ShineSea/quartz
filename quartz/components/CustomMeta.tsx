@@ -117,11 +117,12 @@ const CustomMeta: QuartzComponent = ({ fileData, displayClass, cfg }: QuartzComp
 
 CustomMeta.css = `
 .custom-meta {
-  margin: 1rem 0;
-  padding: 1rem;
-  border-left: 3px solid var(--secondary);
-  background-color: var(--lightgray);
-  border-radius: 4px;
+  margin: var(--meta-container-margin, 1rem 0);
+  padding: var(--meta-container-padding, 1rem);
+  background-color: var(--meta-container-background, var(--lightgray));
+  border: var(--meta-container-border, none);
+  border-radius: var(--meta-container-border-radius, 4px);
+  box-shadow: var(--meta-container-shadow, none);
 }
 
 .custom-meta h3 {
@@ -132,11 +133,13 @@ CustomMeta.css = `
 .custom-meta-table {
   width: 100%;
   border-collapse: collapse;
+  padding: var(--meta-table-padding, 0);
+  border-radius: var(--meta-table-border-radius, 0);
 }
 
 .custom-meta-key {
-  font-weight: bold;
-  width: 120px; /* 固定键列宽度 */
+  font-weight: var(--meta-key-font-weight, bold);
+  width: 120px;
   vertical-align: top;
   padding: 0.25rem 0.5rem 0.25rem 0;
   border-right: 1px solid var(--gray);
@@ -148,11 +151,11 @@ CustomMeta.css = `
 }
 
 .custom-meta-table tr:nth-child(even) {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: rgba(0, 0, 0, var(--meta-striped-opacity, 0.05));
 }
 
 .custom-meta-table tr:hover {
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: rgba(0, 0, 0, var(--meta-row-hover-opacity, 0.1));
 }
 
 .custom-meta-list {

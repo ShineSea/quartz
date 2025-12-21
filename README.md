@@ -19,7 +19,9 @@ npm install
 npx quartz build --serve --port 8765
 ```
 
-## pm2守护
+## pm2守护（没调试好，暂不启用）
+
+> 原项目里面有三个服务。如果添加进程守护的话，需要修改原有的服务启动关闭逻辑的源码。之后再看。
 
 https://pm2.node.org.cn/docs/usage/quick-start/
 

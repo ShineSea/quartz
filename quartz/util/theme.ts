@@ -1,3 +1,5 @@
+import { StyleTheme } from "../../quartz/themes/styles"
+
 export interface ColorScheme {
   light: string
   lightgray: string
@@ -33,6 +35,7 @@ export interface Theme {
   cdnCaching: boolean
   colors: Colors
   fontOrigin: "googleFonts" | "local"
+  styles?: StyleTheme  // 样式主题
 }
 
 export type ThemeKey = keyof Colors
@@ -141,6 +144,8 @@ export async function processGoogleFonts(
 }
 
 export function joinStyles(theme: Theme, ...stylesheet: string[]) {
+  const styles = theme.styles
+  
   return `
 ${stylesheet.join("\n\n")}
 
@@ -159,6 +164,30 @@ ${stylesheet.join("\n\n")}
   --headerFont: "${getFontSpecificationName(theme.typography.header)}", ${DEFAULT_SANS_SERIF};
   --bodyFont: "${getFontSpecificationName(theme.typography.body)}", ${DEFAULT_SANS_SERIF};
   --codeFont: "${getFontSpecificationName(theme.typography.code)}", ${DEFAULT_MONO};
+  
+  ${styles ? `
+  /* Explorer 样式变量 */
+  --explorer-folder-font-weight: ${styles.explorer.folderFontWeight};
+  --explorer-folder-padding: ${styles.explorer.folderPadding};
+  --explorer-folder-border-radius: ${styles.explorer.folderBorderRadius};
+  --explorer-folder-bg-hover: ${styles.explorer.folderBackgroundHover};
+  --explorer-item-spacing: ${styles.explorer.itemSpacing};
+  
+  /* CustomMeta 容器样式变量 */
+  --meta-container-padding: ${styles.customMeta.containerPadding};
+  --meta-container-margin: ${styles.customMeta.containerMargin};
+  --meta-container-background: ${styles.customMeta.containerBackground};
+  --meta-container-border: ${styles.customMeta.containerBorder};
+  --meta-container-border-radius: ${styles.customMeta.containerBorderRadius};
+  --meta-container-shadow: ${styles.customMeta.containerShadow};
+  
+  /* CustomMeta 表格样式变量 */
+  --meta-table-border-radius: ${styles.customMeta.tableBorderRadius};
+  --meta-table-padding: ${styles.customMeta.tablePadding};
+  --meta-key-font-weight: ${styles.customMeta.keyFontWeight};
+  --meta-row-hover-opacity: ${styles.customMeta.rowHoverOpacity};
+  --meta-striped-opacity: ${styles.customMeta.stripedRowOpacity};
+  ` : ''}
 }
 
 :root[saved-theme="dark"] {

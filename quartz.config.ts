@@ -1,5 +1,7 @@
 import { QuartzConfig } from "./quartz/cfg"
 import * as Plugin from "./quartz/plugins"
+import { colorThemes } from "./quartz/themes/colors"
+import { styleThemes } from "./quartz/themes/styles"
 
 /**
  * Quartz 4 Configuration
@@ -27,30 +29,12 @@ const config: QuartzConfig = {
         body: "Source Sans Pro",
         code: "IBM Plex Mono",
       },
-      colors: {
-        lightMode: {
-          light: "#faf8f8",
-          lightgray: "#e5e5e5",
-          gray: "#b8b8b8",
-          darkgray: "#4e4e4e",
-          dark: "#2b2b2b",
-          secondary: "#284b63",
-          tertiary: "#84a59d",
-          highlight: "rgba(143, 159, 169, 0.15)",
-          textHighlight: "#fff23688",
-        },
-        darkMode: {
-          light: "#161618",
-          lightgray: "#393639",
-          gray: "#646464",
-          darkgray: "#d4d4d4",
-          dark: "#ebebec",
-          secondary: "#7b97aa",
-          tertiary: "#84a59d",
-          highlight: "rgba(143, 159, 169, 0.15)",
-          textHighlight: "#b3aa0288",
-        },
-      },
+      // 🎨 颜色主题 - 可选值: default, deepOcean, inkElegance
+      // 在 quartz/themes/colors/index.ts 中查看所有可用主题
+      colors: colorThemes.default,
+      // 🎯 样式主题 - 可选值: default, card, minimal
+      // 在 quartz/themes/styles/index.ts 中查看所有可用样式
+      styles: styleThemes.minimal,
     },
   },
   plugins: {
