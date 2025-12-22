@@ -141,7 +141,7 @@ CustomMeta.css = `
   font-weight: var(--meta-key-font-weight, bold);
   width: 120px;
   vertical-align: top;
-  padding: 0.25rem 0.5rem 0.25rem 0;
+  padding: 0.25rem 0.5rem 0.25rem 0.25rem;
   border-right: 1px solid var(--gray);
 }
 
