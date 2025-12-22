@@ -103,15 +103,18 @@ let index = new FlexSearch.Document<Item>({
     index: [
       {
         field: "title",
-        tokenize: "forward",
+        // tokenize: "forward",
+        tokenize: "full",
       },
       {
         field: "content",
-        tokenize: "forward",
+        // tokenize: "forward",
+        tokenize: "full",
       },
       {
         field: "tags",
-        tokenize: "forward",
+        // tokenize: "forward",
+        tokenize: "full",
       },
     ],
   },
@@ -355,7 +358,7 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
       slug,
       title: searchType === "tags" ? data[slug].title : highlight(term, data[slug].title ?? ""),
       content: highlight(term, data[slug].content ?? "", true),
-      tags: highlightTags(term.substring(1), data[slug].tags),
+      tags: highlightTags(term, data[slug].tags),
     }
   }
 
@@ -594,7 +597,10 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
     const filteredIds = [...allIds].filter((id) => {
       const slug = idDataMap[id]
       const doc = data[slug]
-      const combinedText = `${doc.title ?? ""} ${doc.content ?? ""}`
+      // 根据搜索类型选择要检查的字段
+      const combinedText = searchType === "tags" 
+        ? (doc.tags ?? []).join(" ") 
+        : `${doc.title ?? ""} ${doc.content ?? ""}`
       return matchesAllTerms(combinedText, requiredTerms)
     })
     
