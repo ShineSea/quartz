@@ -6,6 +6,7 @@ export const defaultStyle = {
   description: "Quartz 原始样式设计",
   explorer: {
     folderFontWeight: "600",
+    folderFontSize: "1rem",
     folderPadding: "0",
     folderBorderRadius: "0",
     folderBackgroundHover: "transparent",

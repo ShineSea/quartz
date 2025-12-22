@@ -6,6 +6,7 @@ export const cardStyle = {
   description: "现代化卡片设计，带阴影和圆角",
   explorer: {
     folderFontWeight: "600",
+    folderFontSize: "1.1rem",
     folderPadding: "0.4rem 0.6rem",
     folderBorderRadius: "6px",
     folderBackgroundHover: "var(--highlight)",

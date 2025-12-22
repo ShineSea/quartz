@@ -210,33 +210,40 @@ button.desktop-explorer {
   user-select: none;
   position: relative;
   margin: 2px 0;
+  border-radius: 6px;
+  transition: all 0.15s ease;
 
-  // 文件夹链接样式 - 固定宽度整行效果
+  // 文件夹整行悬浮效果（包括箭头）
+  &:hover {
+    background-color: var(--lightgray);
+    transform: translateX(2px);
+    
+    // 悬浮时文字颜色变化
+    & div > a,
+    & div > button > .folder2-content-wrapper {
+      color: var(--tertiary);
+    }
+  }
+
+  // 文件夹链接样式（folderClickBehavior="link" 时）
   & div > a {
     color: var(--secondary);
     font-family: var(--headerFont);
     font-weight: normal;
+    font-size: var(--explorer-folder-font-size, 1rem);
     line-height: 1.4;
     display: block;
     padding: 0.45rem 0.75rem;
     padding-right: 0.5rem;
-    border-radius: 6px;
-    transition: all 0.15s ease;
     text-decoration: none;
     position: relative;
     flex: 1;
+    transition: color 0.15s ease;
 
-    &:hover {
-      color: var(--tertiary);
-      background-color: var(--lightgray);
-      transform: translateX(2px);
-    }
-
-    // 文件夹被选中：左侧粗竖线 + 背景色
+    // 文件夹被选中：左侧粗竖线
     &.active {
       color: var(--secondary);
       font-weight: 500;
-      background-color: var(--highlight);
 
       &::before {
         content: "";
@@ -251,7 +258,13 @@ button.desktop-explorer {
     }
   }
 
-  // 文件夹按钮样式 - 固定宽度整行效果
+  // 选中状态的整行背景
+  &:has(div > a.active),
+  &:has(div > button > .folder2-content-wrapper.active) {
+    background-color: var(--highlight);
+  }
+
+  // 文件夹按钮样式（folderClickBehavior="collapse" 时）
   & div > button {
     color: var(--dark);
     background-color: transparent;
@@ -270,29 +283,22 @@ button.desktop-explorer {
       display: block;
       color: var(--secondary);
       font-weight: normal;
+      font-size: var(--explorer-folder-font-size, 1rem);
       margin: 0;
       line-height: 1.4;
       pointer-events: none;
       padding: 0.45rem 0.75rem;
       padding-right: 0.5rem;
-      border-radius: 6px;
-      transition: all 0.15s ease;
       position: relative;
       flex: 1;
       width: 100%;
+      transition: color 0.15s ease;
     }
 
-    &:hover > .folder2-content-wrapper {
-      background-color: var(--lightgray);
-      color: var(--tertiary);
-      transform: translateX(2px);
-    }
-
-    // 文件夹被选中：左侧粗竖线 + 背景色
+    // 文件夹被选中：左侧粗竖线
     & > .folder2-content-wrapper.active {
       color: var(--secondary);
       font-weight: 500;
-      background-color: var(--highlight);
 
       &::before {
         content: "";

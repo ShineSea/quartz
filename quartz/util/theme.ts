@@ -168,6 +168,7 @@ ${stylesheet.join("\n\n")}
   ${styles ? `
   /* Explorer 样式变量 */
   --explorer-folder-font-weight: ${styles.explorer.folderFontWeight};
+  --explorer-folder-font-size: ${styles.explorer.folderFontSize};
   --explorer-folder-padding: ${styles.explorer.folderPadding};
   --explorer-folder-border-radius: ${styles.explorer.folderBorderRadius};
   --explorer-folder-bg-hover: ${styles.explorer.folderBackgroundHover};

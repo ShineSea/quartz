@@ -58,6 +58,7 @@ export const defaultContentPageLayout: PageLayout = {
         { Component: Component.ReaderMode() },
       ],
     }),
+    // Component.Explorer(),
     Component.Explorer2({
       accordionMode: true, // 启用手风琴模式
     }),
@@ -94,6 +95,7 @@ export const defaultListPageLayout: PageLayout = {
         { Component: Component.Darkmode() },
       ],
     }),
+    // Component.Explorer(),
     Component.Explorer2({
       accordionMode: true, // 启用手风琴模式
     }),

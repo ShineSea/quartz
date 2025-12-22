@@ -6,6 +6,7 @@ export const minimalStyle = {
   description: "极简设计，强调内容本身",
   explorer: {
     folderFontWeight: "500",
+    folderFontSize: "1rem",
     folderPadding: "0.25rem 0",
     folderBorderRadius: "0",
     folderBackgroundHover: "transparent",

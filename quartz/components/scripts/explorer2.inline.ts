@@ -143,11 +143,9 @@ function createFolderNode(
   if (opts.folderClickBehavior === "link") {
     // Replace button with link for link behavior
     const button = titleContainer.querySelector(".folder2-button") as HTMLElement
-    const wrapper = button.querySelector(".folder2-content-wrapper") as HTMLElement
     const a = document.createElement("a")
     a.href = resolveRelative(currentSlug, folderPath)
     a.dataset.for = folderPath
-    a.className = "folder2-title"
     a.textContent = node.displayName
     
     // Add active class if this folder matches current slug exactly
@@ -155,9 +153,8 @@ function createFolderNode(
       a.classList.add("active")
     }
     
-    // 保持 wrapper 结构，用 a 标签替换 wrapper 内容
-    wrapper.innerHTML = ""
-    wrapper.appendChild(a)
+    // 直接替换掉 button，保持与原版一致
+    button.replaceWith(a)
   } else {
     const wrapper = titleContainer.querySelector(".folder2-content-wrapper") as HTMLElement
     const span = wrapper.querySelector(".folder2-title") as HTMLElement

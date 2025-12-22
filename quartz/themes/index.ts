@@ -31,6 +31,7 @@ export interface StyleTheme {
   // Explorer 目录样式
   explorer: {
     folderFontWeight: string          // 字重（影响视觉层次）
+    folderFontSize: string            // 文件夹字体大小
     folderPadding: string             // 内边距（影响可点击区域）
     folderBorderRadius: string        // 圆角
     folderBackgroundHover: string     // 悬停背景色
