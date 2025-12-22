@@ -46,7 +46,12 @@ export const defaultContentPageLayout: PageLayout = {
     Component.Flex({
       components: [
         {
-          Component: Component.Search(),
+          // Component: Component.Search(),
+          Component: Component.Search2({
+            enablePreview: true,
+            initialDisplayCount: 10, // 首次显示10个
+            loadMoreCount: 10, // 每次加载10个
+          }),
           grow: true,
         },
         { Component: Component.Darkmode() },
@@ -54,16 +59,18 @@ export const defaultContentPageLayout: PageLayout = {
       ],
     }),
     Component.Explorer2({
-      accordionMode: true,  // 启用手风琴模式
+      accordionMode: true, // 启用手风琴模式
     }),
   ],
   right: [
     Component.Graph(),
-    Component.DesktopOnly(Component.TableOfContents2({
-      collapseByDefault: true, // 默认折叠子级标题
-    })),
+    Component.DesktopOnly(
+      Component.TableOfContents2({
+        collapseByDefault: true, // 默认折叠子级标题
+      }),
+    ),
     Component.Backlinks({
-      hideWhenEmpty: false,  // 即使没有反向链接也显示
+      hideWhenEmpty: false, // 即使没有反向链接也显示
     }),
   ],
 }
@@ -77,14 +84,18 @@ export const defaultListPageLayout: PageLayout = {
     Component.Flex({
       components: [
         {
-          Component: Component.Search(),
+          Component: Component.Search2({
+            enablePreview: true,
+            initialDisplayCount: 10,
+            loadMoreCount: 10,
+          }),
           grow: true,
         },
         { Component: Component.Darkmode() },
       ],
     }),
     Component.Explorer2({
-      accordionMode: true,  // 启用手风琴模式
+      accordionMode: true, // 启用手风琴模式
     }),
   ],
   right: [],
