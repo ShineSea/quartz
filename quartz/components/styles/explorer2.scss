@@ -331,12 +331,12 @@ button.desktop-explorer {
   }
 }
 
-// 折叠状态：箭头向右（0度）
+// 折叠状态：箭头向左
 li:has(> .folder2-outer:not(.open)) > .folder2-container > svg {
-  transform: rotate(0deg);
+  transform: rotate(180deg);
 }
 
-// 展开状态：箭头向下（90度）
+// 展开状态：箭头向下
 li:has(> .folder2-outer.open) > .folder2-container > svg {
   transform: rotate(90deg);
 }
