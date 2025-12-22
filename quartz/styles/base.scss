@@ -588,6 +588,7 @@ ul.overflow,
 ol.overflow {
   max-height: 100%;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   width: 100%;
   margin-bottom: 0;
 
