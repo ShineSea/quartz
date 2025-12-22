@@ -9,11 +9,12 @@ interface Item {
   title: string
   content: string
   tags: string[]
+  frontmatter?: Record<string, any>
   [key: string]: any
 }
 
 // Can be expanded with things like "term" in the future
-type SearchType = "basic" | "tags"
+type SearchType = "basic" | "tags" | "yaml"
 let searchType: SearchType = "basic"
 let currentSearchTerm: string = ""
 
@@ -356,7 +357,7 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
     return {
       id,
       slug,
-      title: searchType === "tags" ? data[slug].title : highlight(term, data[slug].title ?? ""),
+      title: searchType === "tags" || searchType === "yaml" ? data[slug].title : highlight(term, data[slug].title ?? ""),
       content: highlight(term, data[slug].content ?? "", true),
       tags: highlightTags(term, data[slug].tags),
     }
@@ -532,11 +533,62 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
     return parts.filter(p => p.length > 0)
   }
 
+  // 解析 YAML 字段搜索语法 @key:value
+  function parseYamlSearch(searchTerm: string): { key: string; value: string } | null {
+    const colonIndex = searchTerm.indexOf(':')
+    if (colonIndex === -1) return null
+    
+    const key = searchTerm.substring(0, colonIndex).trim()
+    const value = searchTerm.substring(colonIndex + 1).trim()
+    
+    if (!key || !value) return null
+    return { key, value }
+  }
+
+  // 模糊匹配 YAML 字段
+  function matchYamlField(doc: any, searchKey: string, searchValue: string): boolean {
+    if (!doc.frontmatter) return false
+    
+    const lowerSearchKey = searchKey.toLowerCase()
+    const lowerSearchValue = searchValue.toLowerCase()
+    
+    // 遍历所有 frontmatter 字段
+    for (const [key, value] of Object.entries(doc.frontmatter)) {
+      // 跳过 title 和 tags，它们有专门的搜索方式
+      if (key === 'title' || key === 'tags') continue
+      
+      const lowerKey = key.toLowerCase()
+      // 模糊匹配 key（key 包含 searchKey）
+      if (!lowerKey.includes(lowerSearchKey)) continue
+      
+      // 模糊匹配 value
+      if (value === null || value === undefined) continue
+      
+      const valueStr = Array.isArray(value) 
+        ? value.join(' ') 
+        : String(value)
+      
+      if (valueStr.toLowerCase().includes(lowerSearchValue)) {
+        return true
+      }
+    }
+    
+    return false
+  }
+
   async function onType(e: HTMLElementEventMap["input"]) {
     if (!searchLayout || !index) return
     currentSearchTerm = (e.target as HTMLInputElement).value
     searchLayout.classList.toggle("display-results", currentSearchTerm !== "")
-    searchType = currentSearchTerm.startsWith("#") ? "tags" : "basic"
+    
+    // 确定搜索类型
+    if (currentSearchTerm.startsWith("#")) {
+      searchType = "tags"
+    } else if (currentSearchTerm.startsWith("@")) {
+      searchType = "yaml"
+    } else {
+      searchType = "basic"
+    }
 
     // 重置显示计数
     currentDisplayCount = initialDisplayCount
@@ -567,6 +619,32 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
           index: ["tags"],
         })
       }
+    } else if (searchType === "yaml") {
+      // YAML 字段搜索
+      currentSearchTerm = currentSearchTerm.substring(1).trim()
+      const yamlSearch = parseYamlSearch(currentSearchTerm)
+      
+      if (!yamlSearch) {
+        // 格式不正确，返回空结果
+        allSearchResults = []
+        await displayResults(allSearchResults)
+        return
+      }
+      
+      // 不使用 FlexSearch，直接过滤所有文档
+      const allIds: Set<number> = new Set()
+      for (let id = 0; id < idDataMap.length; id++) {
+        const slug = idDataMap[id]
+        const doc = data[slug]
+        if (matchYamlField(doc, yamlSearch.key, yamlSearch.value)) {
+          allIds.add(id)
+        }
+      }
+      
+      // 直接显示结果
+      allSearchResults = [...allIds].map((id) => formatForDisplay(currentSearchTerm, id))
+      await displayResults(allSearchResults)
+      return
     } else if (searchType === "basic") {
       searchResults = await index.searchAsync({
         query: currentSearchTerm,
@@ -639,6 +717,7 @@ async function fillDocument(data: ContentIndex) {
         title: fileData.title,
         content: fileData.content,
         tags: fileData.tags,
+        frontmatter: fileData.frontmatter,
       }),
     )
   }
