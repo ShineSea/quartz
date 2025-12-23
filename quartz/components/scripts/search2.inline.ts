@@ -352,30 +352,73 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
     }
   }
 
-  const formatForDisplay = (term: string, id: number) => {
+  // 格式化搜索结果用于显示，支持混合高亮
+  const formatForDisplay = (searchInfo: { text?: string, tags?: string[], yamlQueries?: any[] }, id: number) => {
     const slug = idDataMap[id]
+    const doc = data[slug]
+    
+    // 收集所有需要高亮的词
+    const highlightTerms: string[] = []
+    
+    // 添加文本搜索词
+    if (searchInfo.text && searchInfo.text.trim()) {
+      highlightTerms.push(searchInfo.text.trim())
+    }
+    
+    // 添加标签搜索词
+    if (searchInfo.tags && searchInfo.tags.length > 0) {
+      highlightTerms.push(...searchInfo.tags)
+    }
+    
+    // 添加YAML搜索词
+    if (searchInfo.yamlQueries && searchInfo.yamlQueries.length > 0) {
+      searchInfo.yamlQueries.forEach(query => {
+        if (query.key) highlightTerms.push(query.key)
+        if (query.value) highlightTerms.push(query.value)
+      })
+    }
+    
+    // 合并所有搜索词用于高亮
+    const combinedTerm = highlightTerms.join(' ')
+    
     return {
       id,
       slug,
-      title: searchType === "tags" || searchType === "yaml" ? data[slug].title : highlight(term, data[slug].title ?? ""),
-      content: highlight(term, data[slug].content ?? "", true),
-      tags: highlightTags(term, data[slug].tags),
+      title: combinedTerm ? highlight(combinedTerm, doc.title ?? "") : doc.title ?? "",
+      content: combinedTerm ? highlight(combinedTerm, doc.content ?? "", true) : doc.content ?? "",
+      tags: searchInfo.tags && searchInfo.tags.length > 0 
+        ? highlightTags(searchInfo.tags, doc.tags) 
+        : formatTags(doc.tags),
     }
   }
 
-  function highlightTags(term: string, tags: string[]) {
-    if (!tags || searchType !== "tags") {
+  // 高亮标签（支持多个搜索词）
+  function highlightTags(searchTags: string[], tags: string[]) {
+    if (!tags || tags.length === 0) {
       return []
     }
 
     return tags
       .map((tag) => {
-        if (tag.toLowerCase().includes(term.toLowerCase())) {
+        const isMatch = searchTags.some(searchTag => 
+          tag.toLowerCase().includes(searchTag.toLowerCase())
+        )
+        if (isMatch) {
           return `<li><p class="match-tag">#${tag}</p></li>`
         } else {
           return `<li><p>#${tag}</p></li>`
         }
       })
+      .slice(0, numTagResults)
+  }
+  
+  // 格式化标签（不高亮）
+  function formatTags(tags: string[]) {
+    if (!tags || tags.length === 0) {
+      return []
+    }
+    return tags
+      .map((tag) => `<li><p>#${tag}</p></li>`)
       .slice(0, numTagResults)
   }
 
@@ -505,8 +548,28 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
     if (!searchLayout || !enablePreview || !el || !preview) return
     if (el.classList.contains("result-stats") || el.classList.contains("load-more-btn")) return
     const slug = el.id as FullSlug
+    
+    // 解析当前搜索词，收集所有需要高亮的词
+    const parsed = parseSearchQuery(currentSearchTerm)
+    const highlightTerms: string[] = []
+    
+    if (parsed.text.trim()) {
+      highlightTerms.push(parsed.text.trim())
+    }
+    if (parsed.tags.length > 0) {
+      highlightTerms.push(...parsed.tags)
+    }
+    if (parsed.yamlQueries.length > 0) {
+      parsed.yamlQueries.forEach(query => {
+        if (query.key) highlightTerms.push(query.key)
+        if (query.value) highlightTerms.push(query.value)
+      })
+    }
+    
+    const previewHighlightTerm = highlightTerms.join(' ')
+    
     const innerDiv = await fetchContent(slug).then((contents) =>
-      contents.flatMap((el) => [...highlightHTML(currentSearchTerm, el as HTMLElement).children]),
+      contents.flatMap((el) => [...highlightHTML(previewHighlightTerm, el as HTMLElement).children]),
     )
     previewInner = document.createElement("div")
     previewInner.classList.add("preview-inner")
@@ -682,7 +745,7 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
         return matchesAllTerms(combinedText, requiredTerms)
       })
         
-      allSearchResults = filteredIds.map((id) => formatForDisplay(tagTerm, id))
+      allSearchResults = filteredIds.map((id) => formatForDisplay({ tags: [tagTerm] }, id))
       await displayResults(allSearchResults)
       return
     }
@@ -749,8 +812,12 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
     }
       
     // 显示结果
-    const displayTerm = hasText ? parsed.text : (hasYaml ? "" : "")
-    allSearchResults = [...candidateIds].map((id) => formatForDisplay(displayTerm, id))
+    const searchInfo = {
+      text: hasText ? parsed.text : undefined,
+      tags: hasTags ? parsed.tags : undefined,
+      yamlQueries: hasYaml ? parsed.yamlQueries : undefined
+    }
+    allSearchResults = [...candidateIds].map((id) => formatForDisplay(searchInfo, id))
     await displayResults(allSearchResults)
   }
 
