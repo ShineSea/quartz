@@ -18,6 +18,11 @@ npm install
 ```bash
 npx quartz build --serve --port 8765
 ```
+## 配置说明
+
+- YAML中的系统内置键（title、tags），要小写，才能识别！
+
+
 
 ## pm2守护（没调试好，暂不启用）
 

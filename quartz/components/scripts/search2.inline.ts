@@ -533,24 +533,65 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
     return parts.filter(p => p.length > 0)
   }
 
-  // 解析 YAML 字段搜索语法 @key:value
-  function parseYamlSearch(searchTerm: string): { key: string; value: string } | null {
-    const colonIndex = searchTerm.indexOf(':')
-    if (colonIndex === -1) return null
+  // 解析混合搜索：分离YAML搜索、标签搜索和普通文本
+  // 示例："@author:张三 #AI 机器学习" → { yamlQueries: [{key:'author',value:'张三'}], tags: ['AI'], text: '机器学习' }
+  function parseSearchQuery(searchTerm: string): {
+    yamlQueries: Array<{ type: 'key-value' | 'value-only' | 'key-only', key?: string, value?: string }>,
+    tags: string[],
+    text: string
+  } {
+    const yamlQueries: Array<{ type: 'key-value' | 'value-only' | 'key-only', key?: string, value?: string }> = []
+    const tags: string[] = []
+    const textParts: string[] = []
     
-    const key = searchTerm.substring(0, colonIndex).trim()
-    const value = searchTerm.substring(colonIndex + 1).trim()
+    // 按空格分割
+    const tokens = searchTerm.trim().split(/\s+/)
     
-    if (!key || !value) return null
-    return { key, value }
+    for (const token of tokens) {
+      if (token.startsWith('@')) {
+        // YAML搜索
+        const yamlTerm = token.substring(1)
+        const colonIndex = yamlTerm.indexOf(':')
+        
+        if (colonIndex === -1) {
+          // @key - 搜索包含该键的文档
+          const key = yamlTerm.trim()
+          if (key) yamlQueries.push({ type: 'key-only', key })
+        } else {
+          const key = yamlTerm.substring(0, colonIndex).trim()
+          const value = yamlTerm.substring(colonIndex + 1).trim()
+          
+          if (!key && value) {
+            // @:value - 搜索所有字段的值
+            yamlQueries.push({ type: 'value-only', value })
+          } else if (key && !value) {
+            // @key: - 搜索包含该键的文档
+            yamlQueries.push({ type: 'key-only', key })
+          } else if (key && value) {
+            // @key:value - 搜索指定键值对
+            yamlQueries.push({ type: 'key-value', key, value })
+          }
+        }
+      } else if (token.startsWith('#')) {
+        // 标签搜索
+        const tag = token.substring(1).trim()
+        if (tag) tags.push(tag)
+      } else {
+        // 普通文本
+        textParts.push(token)
+      }
+    }
+    
+    return {
+      yamlQueries,
+      tags,
+      text: textParts.join(' ')
+    }
   }
 
-  // 模糊匹配 YAML 字段
-  function matchYamlField(doc: any, searchKey: string, searchValue: string): boolean {
+  // 模糊匹配 YAML 字段 - 支持三种模式
+  function matchYamlField(doc: any, yamlSearch: { type: 'key-value' | 'value-only' | 'key-only', key?: string; value?: string }): boolean {
     if (!doc.frontmatter) return false
-    
-    const lowerSearchKey = searchKey.toLowerCase()
-    const lowerSearchValue = searchValue.toLowerCase()
     
     // 遍历所有 frontmatter 字段
     for (const [key, value] of Object.entries(doc.frontmatter)) {
@@ -558,133 +599,158 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
       if (key === 'title' || key === 'tags') continue
       
       const lowerKey = key.toLowerCase()
-      // 模糊匹配 key（key 包含 searchKey）
-      if (!lowerKey.includes(lowerSearchKey)) continue
       
-      // 模糊匹配 value
-      if (value === null || value === undefined) continue
-      
-      const valueStr = Array.isArray(value) 
-        ? value.join(' ') 
-        : String(value)
-      
-      if (valueStr.toLowerCase().includes(lowerSearchValue)) {
-        return true
+      if (yamlSearch.type === 'key-only') {
+        // 模式1: @key 或 @key: - 只要文档包含该键即可
+        const lowerSearchKey = yamlSearch.key!.toLowerCase()
+        if (lowerKey.includes(lowerSearchKey)) {
+          return true
+        }
+      } else if (yamlSearch.type === 'value-only') {
+        // 模式2: @:value - 在所有字段值中搜索
+        if (value === null || value === undefined) continue
+        const valueStr = Array.isArray(value) 
+          ? value.join(' ') 
+          : String(value)
+        const lowerSearchValue = yamlSearch.value!.toLowerCase()
+        if (valueStr.toLowerCase().includes(lowerSearchValue)) {
+          return true
+        }
+      } else if (yamlSearch.type === 'key-value') {
+        // 模式3: @key:value - 键值都要匹配
+        const lowerSearchKey = yamlSearch.key!.toLowerCase()
+        const lowerSearchValue = yamlSearch.value!.toLowerCase()
+        
+        // 模糊匹配 key
+        if (!lowerKey.includes(lowerSearchKey)) continue
+        
+        // 模糊匹配 value
+        if (value === null || value === undefined) continue
+        const valueStr = Array.isArray(value) 
+          ? value.join(' ') 
+          : String(value)
+        
+        if (valueStr.toLowerCase().includes(lowerSearchValue)) {
+          return true
+        }
       }
     }
     
     return false
+  }
+  
+  // 检查文档是否匹配所有YAML查询条件
+  function matchAllYamlQueries(doc: any, yamlQueries: Array<{ type: 'key-value' | 'value-only' | 'key-only', key?: string, value?: string }>): boolean {
+    return yamlQueries.every(query => matchYamlField(doc, query))
   }
 
   async function onType(e: HTMLElementEventMap["input"]) {
     if (!searchLayout || !index) return
     currentSearchTerm = (e.target as HTMLInputElement).value
     searchLayout.classList.toggle("display-results", currentSearchTerm !== "")
-    
-    // 确定搜索类型
-    if (currentSearchTerm.startsWith("#")) {
-      searchType = "tags"
-    } else if (currentSearchTerm.startsWith("@")) {
-      searchType = "yaml"
-    } else {
-      searchType = "basic"
-    }
-
+      
     // 重置显示计数
     currentDisplayCount = initialDisplayCount
-
-    let searchResults: DefaultDocumentSearchResults<Item>
-    if (searchType === "tags") {
-      currentSearchTerm = currentSearchTerm.substring(1).trim()
-      const separatorIndex = currentSearchTerm.indexOf(" ")
-      if (separatorIndex != -1) {
-        // search by title and content index and then filter by tag (implemented in flexsearch)
-        const tag = currentSearchTerm.substring(0, separatorIndex)
-        const query = currentSearchTerm.substring(separatorIndex + 1).trim()
-        searchResults = await index.searchAsync({
-          query: query,
-          // 搜索无限大(实际上限10000)
-          limit: 10000,
-          index: ["title", "content"],
-          tag: { tags: tag },
-        })
-        // set search type to basic and remove tag from term for proper highlightning and scroll
-        searchType = "basic"
-        currentSearchTerm = query
-      } else {
-        // default search by tags index
-        searchResults = await index.searchAsync({
-          query: currentSearchTerm,
-          limit: 10000,
-          index: ["tags"],
-        })
-      }
-    } else if (searchType === "yaml") {
-      // YAML 字段搜索
-      currentSearchTerm = currentSearchTerm.substring(1).trim()
-      const yamlSearch = parseYamlSearch(currentSearchTerm)
+  
+    // 解析搜索查询
+    const parsed = parseSearchQuery(currentSearchTerm)
+    const hasYaml = parsed.yamlQueries.length > 0
+    const hasTags = parsed.tags.length > 0
+    const hasText = parsed.text.trim().length > 0
       
-      if (!yamlSearch) {
-        // 格式不正确，返回空结果
-        allSearchResults = []
-        await displayResults(allSearchResults)
-        return
+    // 如果只有标签搜索，使用原有的tags搜索逻辑
+    if (hasTags && !hasYaml && !hasText && parsed.tags.length === 1) {
+      searchType = "tags"
+      const tagTerm = parsed.tags[0]
+      const searchResults = await index.searchAsync({
+        query: tagTerm,
+        limit: 10000,
+        index: ["tags"],
+      })
+        
+      const getByField = (field: string): number[] => {
+        const results = searchResults.filter((x) => x.field === field)
+        return results.length === 0 ? [] : ([...results[0].result] as number[])
       }
-      
-      // 不使用 FlexSearch，直接过滤所有文档
-      const allIds: Set<number> = new Set()
-      for (let id = 0; id < idDataMap.length; id++) {
+        
+      const allIds: Set<number> = new Set([...getByField("tags")])
+      const requiredTerms = extractRequiredTerms(tagTerm)
+      const filteredIds = [...allIds].filter((id) => {
         const slug = idDataMap[id]
         const doc = data[slug]
-        if (matchYamlField(doc, yamlSearch.key, yamlSearch.value)) {
-          allIds.add(id)
-        }
-      }
-      
-      // 直接显示结果
-      allSearchResults = [...allIds].map((id) => formatForDisplay(currentSearchTerm, id))
+        const combinedText = (doc.tags ?? []).join(" ")
+        return matchesAllTerms(combinedText, requiredTerms)
+      })
+        
+      allSearchResults = filteredIds.map((id) => formatForDisplay(tagTerm, id))
       await displayResults(allSearchResults)
       return
-    } else if (searchType === "basic") {
-      searchResults = await index.searchAsync({
-        query: currentSearchTerm,
-        // 搜索无限大(实际上限10000)
+    }
+      
+    // 混合搜索逻辑
+    let candidateIds: Set<number> = new Set()
+      
+    // 第一步：如果有文本搜索，使用FlexSearch获取候选结果
+    if (hasText) {
+      searchType = "basic"
+      const searchResults = await index.searchAsync({
+        query: parsed.text,
         limit: 10000,
         index: ["title", "content"],
       })
+        
+      const getByField = (field: string): number[] => {
+        const results = searchResults.filter((x) => x.field === field)
+        return results.length === 0 ? [] : ([...results[0].result] as number[])
+      }
+        
+      candidateIds = new Set([
+        ...getByField("title"),
+        ...getByField("content"),
+      ])
+        
+      // 过滤：确保包含所有必须词
+      const requiredTerms = extractRequiredTerms(parsed.text)
+      const filteredByText = [...candidateIds].filter((id) => {
+        const slug = idDataMap[id]
+        const doc = data[slug]
+        const combinedText = `${doc.title ?? ""} ${doc.content ?? ""}`
+        return matchesAllTerms(combinedText, requiredTerms)
+      })
+      candidateIds = new Set(filteredByText)
+    } else {
+      // 没有文本搜索，候选集为所有文档
+      for (let i = 0; i < idDataMap.length; i++) {
+        candidateIds.add(i)
+      }
     }
-
-    const getByField = (field: string): number[] => {
-      const results = searchResults.filter((x) => x.field === field)
-      return results.length === 0 ? [] : ([...results[0].result] as number[])
+      
+    // 第二步：过滤YAML条件
+    if (hasYaml) {
+      searchType = hasText ? "basic" : "yaml"
+      candidateIds = new Set([...candidateIds].filter((id) => {
+        const slug = idDataMap[id]
+        const doc = data[slug]
+        return matchAllYamlQueries(doc, parsed.yamlQueries)
+      }))
     }
-
-    // order titles ahead of content
-    const allIds: Set<number> = new Set([
-      ...getByField("title"),
-      ...getByField("content"),
-      ...getByField("tags"),
-    ])
-
-    // --- 过滤结果 ---
-
-    // 提取必需的搜索词
-    const requiredTerms = extractRequiredTerms(currentSearchTerm)
-    
-    // 过滤结果：只保留包含所有必需词的文档
-    const filteredIds = [...allIds].filter((id) => {
-      const slug = idDataMap[id]
-      const doc = data[slug]
-      // 根据搜索类型选择要检查的字段
-      const combinedText = searchType === "tags" 
-        ? (doc.tags ?? []).join(" ") 
-        : `${doc.title ?? ""} ${doc.content ?? ""}`
-      return matchesAllTerms(combinedText, requiredTerms)
-    })
-    
-    // 存储所有结果(不限制数量)
-    allSearchResults = filteredIds.map((id) => formatForDisplay(currentSearchTerm, id))
-    
+      
+    // 第三步：过滤标签条件
+    if (hasTags) {
+      candidateIds = new Set([...candidateIds].filter((id) => {
+        const slug = idDataMap[id]
+        const doc = data[slug]
+        const docTags = (doc.tags ?? []).map((t: string) => t.toLowerCase())
+        // 所有标签都必须匹配
+        return parsed.tags.every(searchTag => 
+          docTags.some((docTag: string) => docTag.includes(searchTag.toLowerCase()))
+        )
+      }))
+    }
+      
+    // 显示结果
+    const displayTerm = hasText ? parsed.text : (hasYaml ? "" : "")
+    allSearchResults = [...candidateIds].map((id) => formatForDisplay(displayTerm, id))
     await displayResults(allSearchResults)
   }
 
