@@ -27,9 +27,9 @@ const CustomMeta: QuartzComponent = ({ fileData, displayClass, cfg }: QuartzComp
   const frontmatter = fileData.frontmatter
   if (!frontmatter) return null
 
-  // 获取所有非内置的元数据字段
+  // 获取所有非内置的元数据字段（包括值为空的字段）
   const customFields = Object.keys(frontmatter).filter(
-    key => !builtinFields.includes(key) && frontmatter[key] !== undefined && frontmatter[key] !== null
+    key => !builtinFields.includes(key) && frontmatter[key] !== undefined
   )
 
   // 如果没有自定义字段，不渲染任何内容
@@ -98,16 +98,15 @@ const CustomMeta: QuartzComponent = ({ fileData, displayClass, cfg }: QuartzComp
         <tbody>
           {customFields.map(field => {
             const value = frontmatter[field]
-            // 只渲染非空值
-            if (value !== undefined && value !== null && value !== '') {
-              return (
-                <tr key={field}>
-                  <td class="custom-meta-key">{field.replace(/_/g, ' ')}</td>
-                  <td class="custom-meta-value">{renderValue(value)}</td>
-                </tr>
-              )
-            }
-            return null
+            // 渲染所有字段，包括空值
+            return (
+              <tr key={field}>
+                <td class="custom-meta-key">{field.replace(/_/g, ' ')}</td>
+                <td class="custom-meta-value">
+                  {(value === null || value === '') ? '' : renderValue(value)}
+                </td>
+              </tr>
+            )
           })}
         </tbody>
       </table>
