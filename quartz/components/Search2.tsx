@@ -7,8 +7,8 @@ import { i18n } from "../i18n"
 
 export interface Search2Options {
   enablePreview: boolean
-  initialDisplayCount: number  // 首次显示数量
-  loadMoreCount: number  // 每次加载更多的数量
+  initialDisplayCount: number  // 首批显示的数量
+  loadMoreCount: number  // 每批加载更多的数量
 }
 
 const defaultOptions: Search2Options = {

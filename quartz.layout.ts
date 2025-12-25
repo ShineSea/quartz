@@ -22,20 +22,53 @@ export const defaultContentPageLayout: PageLayout = {
       component: Component.Breadcrumbs(),
       condition: (page) => page.fileData.slug !== "index",
     }),
-    Component.ArticleTitle(),
-    Component.ContentMeta(),
-    Component.CustomMeta(), // 添加自定义元数据组件
-    Component.TagList(),
-    // 在首页显示自定义 Homepage 组件
+    // 首页不显示普通文章标题
     Component.ConditionalRender({
-      component: Component.Homepage({
-        // 可选配置：指定要显示的一级目录（留空则显示全部）
-        // topFolders: ["技术", "笔记", "项目"],
-        // 可选配置：指定要显示的常用标签（留空则显示全部）
-        // featuredTags: ["JavaScript", "Python", "React"],
-        showFolderCount: true,
-        foldersTitle: "📂 探索内容",
-        tagsTitle: "🏷️ 常用标签",
+      component: Component.ArticleTitle(),
+      condition: (page) => page.fileData.slug !== "index",
+    }),
+    // 首页不显示元数据（修改时间、阅读时长）
+    Component.ConditionalRender({
+      component: Component.ContentMeta(),
+      condition: (page) => page.fileData.slug !== "index",
+    }),
+    // 首页不显示标签列表
+    Component.ConditionalRender({
+      component: Component.TagList(),
+      condition: (page) => page.fileData.slug !== "index",
+    }),
+    // 首页不显示自定义元数据
+    Component.ConditionalRender({
+      component: Component.CustomMeta(),
+      condition: (page) => page.fileData.slug !== "index",
+    }),
+    // 在首页显示自定义标题
+    Component.ConditionalRender({
+      component: Component.HomepageTitle({
+        // title: "欢迎来到我的知识库", // 可自定义标题
+        // description: "探索我的学习笔记、技术文章和项目文档", // 可添加描述
+      }),
+      condition: (page) => page.fileData.slug === "index",
+    }),
+    // 在首页显示文件夹卡片（使用 BorderBox 包裹）
+    Component.ConditionalRender({
+      component: Component.BorderBox({
+        component: Component.FolderCards({
+          // topFolders: ["wiki", "notes"], // 可指定要显示的文件夹
+          showFolderCount: true,
+          title: "📂 内容分类",
+        }),
+      }),
+      condition: (page) => page.fileData.slug === "index",
+    }),
+    // 在首页显示常用标签（使用 BorderBox 包裹）
+    Component.ConditionalRender({
+      component: Component.BorderBox({
+        component: Component.FeaturedTags({
+          // featuredTags: ["JavaScript", "Python"], // 可指定要显示的标签
+          // maxTags: 20, // 最多显示20个标签
+          title: "🏷️ 常用标签",
+        }),
       }),
       condition: (page) => page.fileData.slug === "index",
     }),
@@ -62,6 +95,7 @@ export const defaultContentPageLayout: PageLayout = {
     Component.Explorer2({
       accordionMode: true, // 启用手风琴模式
     }),
+    Component.FeaturedTags(),
   ],
   right: [
     Component.Graph(),

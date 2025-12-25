@@ -1,11 +1,8 @@
 import { ColorScheme } from "../../util/theme"
 
-/**
- * 深海蓝配色主题 - 专业、沉稳、适合技术文档
- */
-export const deepOceanColors = {
+export const oceanColors = {
   name: "深海蓝",
-  description: "专业沉稳的深蓝配色，适合技术文档和知识库",
+  description: "深蓝配色",
   lightMode: {
     light: "#f8fafc",           // 极浅的蓝灰色背景
     lightgray: "#e2e8f0",       // 浅蓝灰

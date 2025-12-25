@@ -1,7 +1,8 @@
 import { QuartzConfig } from "./quartz/cfg"
 import * as Plugin from "./quartz/plugins"
-import { defaultColors, deepOceanColors, inkEleganceColors } from "./quartz/themes"
-import { defaultStyle, cardStyle, minimalStyle } from "./quartz/themes"
+// === 主题引入 ===
+import { defaultColors, oceanColors } from "./quartz/themes"
+import { defaultStyle, cardStyle} from "./quartz/themes"
 
 /**
  * Quartz 4 Configuration
@@ -29,11 +30,9 @@ const config: QuartzConfig = {
         body: "Source Sans Pro",
         code: "IBM Plex Mono",
       },
-      // 🎨 颜色主题 - 可选值: defaultColors, deepOceanColors, inkEleganceColors
-      // 在 quartz/themes/colors/ 中查看所有可用主题
-      colors: defaultColors,
-      // 🎯 样式主题 - 可选值: defaultStyle, cardStyle, minimalStyle
-      // 在 quartz/themes/styles/ 中查看所有可用样式
+      // 颜色主题🎨在 quartz/themes/colors/ 中查看所有可用主题
+      colors: oceanColors,
+      // 样式主题🖼️在 quartz/themes/styles/ 中查看所有可用样式
       styles: cardStyle,
     },
   },

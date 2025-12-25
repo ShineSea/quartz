@@ -95,7 +95,8 @@ const encoder = (str: string): string[] => {
   return tokens
 }
 
-// 在这里配置分词器
+// 配置分词器
+// 这边的tokenize方式只会影响英文
 let index = new FlexSearch.Document<Item>({
   encode: encoder,
   document: {
@@ -104,18 +105,18 @@ let index = new FlexSearch.Document<Item>({
     index: [
       {
         field: "title",
-        // tokenize: "forward",
-        tokenize: "full",
+        tokenize: "forward",
+        // tokenize: "full",
       },
       {
         field: "content",
-        // tokenize: "forward",
-        tokenize: "full",
+        tokenize: "forward",
+        // tokenize: "full",
       },
       {
         field: "tags",
-        // tokenize: "forward",
-        tokenize: "full",
+        tokenize: "forward",
+        // tokenize: "full",
       },
     ],
   },
@@ -461,7 +462,7 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
     return itemTile
   }
 
-  // 新增：创建"加载更多"按钮
+  // 新增：创建“加载更多”按钮
   function createLoadMoreButton(remainingCount: number): HTMLDivElement {
     const loadMoreBtn = document.createElement("div")
     loadMoreBtn.classList.add("result-card", "load-more-btn")
@@ -502,7 +503,7 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
       const itemsToShow = finalResults.slice(0, currentDisplayCount)
       results.append(...itemsToShow.map(resultToHTML))
       
-      // 如果还有更多结果,显示"加载更多"按钮
+      // 如果还有更多结果，显示“加载更多”按钮
       if (currentDisplayCount < finalResults.length) {
         const remainingCount = finalResults.length - currentDisplayCount
         results.appendChild(createLoadMoreButton(remainingCount))
@@ -758,6 +759,7 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
       searchType = "basic"
       const searchResults = await index.searchAsync({
         query: parsed.text,
+        // 这里的limit可能需要根据实际情况调整
         limit: 10000,
         index: ["title", "content"],
       })

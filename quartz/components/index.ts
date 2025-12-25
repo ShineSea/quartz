@@ -27,7 +27,10 @@ import Breadcrumbs from "./Breadcrumbs"
 import Comments from "./Comments"
 import Flex from "./Flex"
 import ConditionalRender from "./ConditionalRender"
-import Homepage from "./Homepage"
+import BorderBox from "./BorderBox"
+import HomepageTitle from "./HomepageTitle"
+import FolderCards from "./FolderCards"
+import FeaturedTags from "./FeaturedTags"
 
 export {
   ArticleTitle,
@@ -59,5 +62,8 @@ export {
   Comments,
   Flex,
   ConditionalRender,
-  Homepage,
+  BorderBox,
+  HomepageTitle,
+  FolderCards,
+  FeaturedTags,
 }

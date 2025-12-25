@@ -1,9 +1,9 @@
 /**
- * 卡片样式主题 - 现代化卡片设计
+ * 卡片主题 
  */
 export const cardStyle = {
   name: "卡片样式",
-  description: "现代化卡片设计，带阴影和圆角",
+  description: "带阴影和圆角",
   explorer: {
     folderFontWeight: "600",
     folderFontSize: "1.1rem",

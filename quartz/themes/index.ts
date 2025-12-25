@@ -1,16 +1,11 @@
+// Quartz 主题系统
+// 类型定义，主题配置导出
+
 import { ColorScheme } from "../util/theme"
 
-/**
- * Quartz 主题系统
- * 
- * 这个文件统一导出所有主题配置和类型定义
- */
+// === 类型定义 ===
 
-// ==================== 类型定义 ====================
-
-/**
- * 颜色主题接口
- */
+// 颜色主题接口
 export interface ColorTheme {
   name: string
   description?: string
@@ -18,12 +13,9 @@ export interface ColorTheme {
   darkMode: ColorScheme
 }
 
-/**
- * 样式主题接口
- * 
- * 只包含视觉风格相关的配置（颜色、圆角、阴影、边框等）
- * 字号、间距等基础样式请在源码中直接定义
- */
+// 样式主题接口
+// 目前只包含视觉风格相关的配置（颜色、圆角、阴影、边框等），字号、间距等基础样式在源码中直接定义
+
 export interface StyleTheme {
   name: string
   description?: string
@@ -75,14 +67,13 @@ export interface StyleTheme {
   }
 }
 
-// ==================== 主题导出 ====================
+// === 主题导出 ===
 
 // 导出配色主题
-export { defaultColors } from "./colors/default"
-export { deepOceanColors } from "./colors/deepOcean"
-export { inkEleganceColors } from "./colors/inkElegance"
+export * from "./colors/default"
+export * from "./colors/ocean"
+export * from "./colors/ink"
 
 // 导出样式主题
-export { defaultStyle } from "./styles/default"
-export { cardStyle } from "./styles/card"
-export { minimalStyle } from "./styles/minimal"
+export * from "./styles/default"
+export * from "./styles/card"

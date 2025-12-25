@@ -1,9 +1,7 @@
-/**
- * 默认样式主题 - 保持原始 Quartz 样式
- */
+// 默认样式主题（Quartz原先的样式）
 export const defaultStyle = {
   name: "默认样式",
-  description: "Quartz 原始样式设计",
+  description: "Quartz 原始样式",
   explorer: {
     folderFontWeight: "600",
     folderFontSize: "1rem",
