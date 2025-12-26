@@ -62,23 +62,35 @@ export const defaultContentPageLayout: PageLayout = {
       condition: (page) => page.fileData.slug === "index",
     }),
     // 在首页显示常用标签（使用 BorderBox 包裹）
+    // Component.ConditionalRender({
+    //   component: Component.BorderBox({
+    //     component: Component.FeaturedTags({
+    //       // featuredTags: ["JavaScript", "Python"], // 可指定要显示的标签
+    //       // maxTags: 20, // 最多显示20个标签
+    //       title: "常用标签 🏷️",
+    //     }),
+    //   }),
+    //   condition: (page) => page.fileData.slug === "index",
+    // }),
+    // 在首页显示热门文章和最近更新（两列布局）
     Component.ConditionalRender({
       component: Component.BorderBox({
-        component: Component.FeaturedTags({
-          // featuredTags: ["JavaScript", "Python"], // 可指定要显示的标签
-          // maxTags: 20, // 最多显示20个标签
-          title: "常用标签 🏷️",
+        component: Component.RecentUpdates({
+          // topFolders: ["wiki", "notes"], // 可指定要显示的文件夹
+          title: "最近更新 🕒",
+          limit: 10,
+          showDate: true,
         }),
       }),
       condition: (page) => page.fileData.slug === "index",
     }),
-    // 在首页显示最近更新（使用 BorderBox 包裹）
     Component.ConditionalRender({
       component: Component.BorderBox({
-        component: Component.RecentUpdates({
-          title: "最近更新 🕒",
-          limit: 10, // 显示最近10篇文章
-          showDate: true, // 显示日期
+        component: Component.PopularArticles({
+          // topFolders: ["wiki", "notes"], // 可指定要显示的文件夹
+          title: "热门文章 🔥",
+          limit: 10,
+          showCount: true,
         }),
       }),
       condition: (page) => page.fileData.slug === "index",
@@ -123,7 +135,11 @@ export const defaultContentPageLayout: PageLayout = {
 
 // components for pages that display lists of pages  (e.g. tags or folders)
 export const defaultListPageLayout: PageLayout = {
-  beforeBody: [Component.Breadcrumbs(), Component.ArticleTitle(), Component.ContentMeta({ showReadingTime: false })],
+  beforeBody: [
+    Component.Breadcrumbs(),
+    Component.ArticleTitle(),
+    Component.ContentMeta({ showReadingTime: false }),
+  ],
   left: [
     Component.PageTitle(),
     Component.MobileOnly(Component.Spacer()),

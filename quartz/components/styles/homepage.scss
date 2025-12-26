@@ -247,3 +247,9 @@
     font-size: 0.8rem;
   }
 }
+
+// 热门文章链接数量样式
+.popular-count {
+  color: var(--secondary);
+  font-weight: $semiBoldWeight;
+}
