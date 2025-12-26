@@ -106,7 +106,7 @@ export const defaultContentPageLayout: PageLayout = {
     Component.Explorer2({
       accordionMode: true, // 启用手风琴模式
     }),
-    Component.FeaturedTags(),
+    Component.HomepageStyles(), // 确保 homepage.scss 样式被加载
   ],
   right: [
     Component.Graph(),

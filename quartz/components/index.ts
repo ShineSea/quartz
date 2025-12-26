@@ -29,6 +29,7 @@ import Flex from "./Flex"
 import ConditionalRender from "./ConditionalRender"
 import BorderBox from "./BorderBox"
 import HomepageTitle from "./HomepageTitle"
+import HomepageStyles from "./HomepageStyles"
 import FolderCards from "./FolderCards"
 import FeaturedTags from "./FeaturedTags"
 import RecentUpdates from "./RecentUpdates"
@@ -65,6 +66,7 @@ export {
   ConditionalRender,
   BorderBox,
   HomepageTitle,
+  HomepageStyles,
   FolderCards,
   FeaturedTags,
   RecentUpdates,
