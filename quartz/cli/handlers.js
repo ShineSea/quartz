@@ -233,7 +233,12 @@ See the [documentation](https://quartz.jzhao.xyz) for how to get started.
  * @param {*} argv arguments for `build`
  */
 export async function handleBuild(argv) {
-  if (argv.serve) {
+  // 新增：当使用 API 模式时，设置全局变量
+  if (argv.api) {
+    globalThis.__QUARTZ_API_MODE__ = true
+  }
+
+  if (argv.serve && !argv.api) {
     argv.watch = true
   }
 
@@ -301,46 +306,58 @@ export async function handleBuild(argv) {
 
   const buildMutex = new Mutex()
   let lastBuildMs = 0
-  let cleanupBuild = null
+  let buildApi = null
   const build = async (clientRefresh) => {
     const buildStart = new Date().getTime()
-    lastBuildMs = buildStart
     const release = await buildMutex.acquire()
-    if (lastBuildMs > buildStart) {
+      
+    try {
+      // 防止在等待锁的过程中，有更新的请求已经开始执行
+      if (lastBuildMs > buildStart) {
+        return
+      }
+        
+      lastBuildMs = buildStart
+
+      if (buildApi) {
+        console.log(styleText("yellow", "Detected a source code change, doing a hard rebuild..."))
+        // 调用 close 方法清理旧的构建
+        if (typeof buildApi.close === "function") {
+          await buildApi.close()
+        }
+      }
+
+      const result = await ctx.rebuild().catch((err) => {
+        console.error(`${styleText("red", "Couldn't parse Quartz configuration:")} ${fp}`)
+        console.log(`Reason: ${styleText("grey", err)}`)
+        if (globalThis.__QUARTZ_API_MODE__) {
+          throw err
+        } else {
+          process.exit(1)
+        }
+      })
+
+      if (argv.bundleInfo) {
+        const outputFileName = "quartz/.quartz-cache/transpiled-build.mjs"
+        const meta = result.metafile.outputs[outputFileName]
+        console.log(
+          `Successfully transpiled ${Object.keys(meta.inputs).length} files (${prettyBytes(
+            meta.bytes,
+          )})`,
+        )
+        console.log(await esbuild.analyzeMetafile(result.metafile, { color: true }))
+      }
+
+      // bypass module cache
+      // https://github.com/nodejs/modules/issues/307
+      const { default: buildQuartz } = await import(`../../${cacheFile}?update=${randomUUID()}`)
+      // ^ this import is relative, so base "cacheFile" path can't be used
+
+      buildApi = await buildQuartz(argv, buildMutex, clientRefresh)
+      clientRefresh()
+    } finally {
       release()
-      return
     }
-
-    if (cleanupBuild) {
-      console.log(styleText("yellow", "Detected a source code change, doing a hard rebuild..."))
-      await cleanupBuild()
-    }
-
-    const result = await ctx.rebuild().catch((err) => {
-      console.error(`${styleText("red", "Couldn't parse Quartz configuration:")} ${fp}`)
-      console.log(`Reason: ${styleText("grey", err)}`)
-      process.exit(1)
-    })
-    release()
-
-    if (argv.bundleInfo) {
-      const outputFileName = "quartz/.quartz-cache/transpiled-build.mjs"
-      const meta = result.metafile.outputs[outputFileName]
-      console.log(
-        `Successfully transpiled ${Object.keys(meta.inputs).length} files (${prettyBytes(
-          meta.bytes,
-        )})`,
-      )
-      console.log(await esbuild.analyzeMetafile(result.metafile, { color: true }))
-    }
-
-    // bypass module cache
-    // https://github.com/nodejs/modules/issues/307
-    const { default: buildQuartz } = await import(`../../${cacheFile}?update=${randomUUID()}`)
-    // ^ this import is relative, so base "cacheFile" path can't be used
-
-    cleanupBuild = await buildQuartz(argv, buildMutex, clientRefresh)
-    clientRefresh()
   }
 
   let clientRefresh = () => {}
@@ -352,8 +369,86 @@ export async function handleBuild(argv) {
       argv.baseDir = "/" + argv.baseDir
     }
 
-    await build(clientRefresh)
+    // 改为根据命令行参数决定是否执行初始构建
+    // await build(clientRefresh)
+    // API 模式：不执行初始构建
+    if (argv.api) {
+      console.log(styleText("cyan", "🔌 API mode enabled - waiting for rebuild requests..."))
+      console.log(
+        styleText(
+          "grey",
+          `Send POST to http://${argv.host}:${argv.port}/api/rebuild to trigger build`,
+        ),
+      )
+    } else {
+      // 普通模式：执行初始构建
+      await build(clientRefresh)
+    }
     const server = http.createServer(async (req, res) => {
+      // 提取文件路径的辅助函数
+      const extractFilePath = (message) => {
+        const match = message?.match(/`([^`]+\.md)`/)
+        return match ? match[1] : null
+      }
+
+      // API endpoint for triggering builds
+      if (argv.api && req.url?.startsWith(argv.baseDir + "/api/build")) {
+        if (req.method === "POST") {
+          try {
+            console.log(styleText("yellow", "API build trigger received"))
+            await build(clientRefresh)
+            res.writeHead(200, { "Content-Type": "application/json" })
+            res.end(JSON.stringify({ success: true, message: "Build triggered successfully" }))
+            return
+          } catch (error) {
+            // 移除 ANSI 颜色代码的工具函数
+            const stripAnsi = (str) => {
+              if (typeof str !== 'string') return str
+              return str.replace(
+                /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
+                '',
+              )
+            }
+
+            // 检查是否为 QuartzError
+            const isQuartzError = error.name === 'QuartzError'
+            
+            // 获取原始错误信息（移除 ANSI 代码）
+            const cleanMessage = stripAnsi(
+              isQuartzError ? error.originalError?.message || error.message : error.message || String(error)
+            )
+            
+            // 获取堆栈信息（移除 ANSI 代码）
+            const cleanStack = stripAnsi(
+              isQuartzError ? error.originalError?.stack : error.stack
+            )
+
+            // 打印日志（保留颜色）
+            console.error(styleText("red", "API build error: "))
+            if (isQuartzError && error.formattedMessage) {
+              // QuartzError 已经包含格式化的错误信息
+              console.error(error.formattedMessage)
+            } else {
+              console.error(error.stack || error.message || error)
+            }
+            
+            res.writeHead(500, { "Content-Type": "application/json" })
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: cleanMessage,
+                file: isQuartzError ? extractFilePath(cleanMessage) : null,
+                details: cleanStack,
+              }),
+            )
+            return
+          }
+        } else {
+          res.writeHead(405, { Allow: "POST" })
+          res.end()
+          return
+        }
+      }
       if (argv.baseDir && !req.url?.startsWith(argv.baseDir)) {
         console.log(
           styleText(
@@ -453,15 +548,57 @@ export async function handleBuild(argv) {
       return serve()
     })
 
-    server.listen(argv.port)
-    const wss = new WebSocketServer({ port: argv.wsPort })
-    wss.on("connection", (ws) => connections.push(ws))
-    console.log(
-      styleText(
-        "cyan",
-        `Started a Quartz server listening at http://localhost:${argv.port}${argv.baseDir}`,
-      ),
-    )
+    // server.listen(argv.port)
+    // const wss = new WebSocketServer({ port: argv.wsPort })
+    // wss.on("connection", (ws) => connections.push(ws))
+    // console.log(
+    //   styleText(
+    //     "cyan",
+    //     `Started a Quartz server listening at http://localhost:${argv.port}${argv.baseDir}`,
+    //   ),
+    // )
+
+    try {
+      server.listen(argv.port)
+      const wss = new WebSocketServer({ port: argv.wsPort })
+      wss.on("connection", (ws) => connections.push(ws))
+      console.log(
+        styleText(
+          "cyan",
+          `Started a Quartz server listening at http://localhost:${argv.port}${argv.baseDir}`,
+        ),
+      )
+    } catch (error) {
+      if (error.code === "EACCES") {
+        console.error(styleText("red", `Error: Permission denied to listen on port ${argv.port}`))
+        console.error(
+          styleText(
+            "yellow",
+            "This port might be reserved or you don't have permission to use it.",
+          ),
+        )
+      } else if (error.code === "EADDRINUSE") {
+        console.error(styleText("red", `Error: Port ${argv.port} is already in use`))
+        console.error(
+          styleText("yellow", "This port is currently being used by another application."),
+        )
+        // 通知 PM2 进程已就绪
+        if (process.send) {
+          process.send("ready")
+        }
+      } else {
+        console.error(styleText("red", `Error starting server: ${error.message}`))
+      }
+      console.error(styleText("grey", `\nTry using a different port with the --port option:`))
+      console.error(styleText("grey", `  npx quartz build --serve --api --port 8081`))
+      // process.exit(1)
+      // 新增：当使用 API 模式时，不退出进程
+      if (globalThis.__QUARTZ_API_MODE__) {
+        throw error // API 模式不退出
+      } else {
+        process.exit(1)
+      }
+    }
   } else {
     await build(clientRefresh)
     ctx.dispose()
@@ -484,8 +621,60 @@ export async function handleBuild(argv) {
 
     console.log(styleText("grey", "hint: exit with ctrl+c"))
   }
-}
 
+  // 在 handleBuild 函数末尾，第 487 行之前添加：
+
+  // 优雅关闭处理（PM2 兼容）
+  if (argv.serve) {
+    const gracefulShutdown = async (signal) => {
+      console.log(`\n${styleText("yellow", `Received ${signal}, shutting down gracefully...`)}`)
+
+      try {
+        // 1. 关闭 HTTP Server
+        await new Promise((resolve, reject) => {
+          server.close((err) => {
+            if (err) reject(err)
+            else {
+              console.log(styleText("grey", "HTTP server closed"))
+              resolve()
+            }
+          })
+        })
+
+        // 2. 关闭 WebSocket Server
+        await new Promise((resolve, reject) => {
+          wss.close((err) => {
+            if (err) reject(err)
+            else {
+              console.log(styleText("grey", "WebSocket server closed"))
+              resolve()
+            }
+          })
+        })
+
+        // 3. 关闭文件监听器（如果有）
+        if (cleanupBuild) {
+          await cleanupBuild()
+          console.log(styleText("grey", "Content watcher closed"))
+        }
+
+        // 4. 关闭 esbuild context
+        await ctx.dispose()
+        console.log(styleText("grey", "Build context disposed"))
+
+        console.log(styleText("green", "Shutdown complete"))
+        process.exit(0)
+      } catch (err) {
+        console.error(styleText("red", `Error during shutdown: ${err.message}`))
+        process.exit(1)
+      }
+    }
+
+    // 监听 PM2 和手动终止信号
+    process.on("SIGINT", () => gracefulShutdown("SIGINT"))
+    process.on("SIGTERM", () => gracefulShutdown("SIGTERM"))
+  }
+}
 /**
  * Handles `npx quartz update`
  * @param {*} argv arguments for `update`

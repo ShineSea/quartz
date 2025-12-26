@@ -3,7 +3,7 @@ module.exports = {
   apps: [{
     name: "my-quartz",
     script: "./quartz/bootstrap-cli.mjs",
-    args: "build --serve --port 8765",
+    args: "build --serve --api --port 8181 --wsPort 3002",
     interpreter: "node",
     interpreter_args: "--no-deprecation",
     // 与 bootstrap-cli.mjs 第一行的 shebang #!/usr/bin/env -S node --no-deprecation 保持一致
