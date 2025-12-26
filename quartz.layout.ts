@@ -86,9 +86,9 @@ export const defaultContentPageLayout: PageLayout = {
     }),
     Component.ConditionalRender({
       component: Component.BorderBox({
-        component: Component.PopularArticles({
+        component: Component.MostLinked({
           // topFolders: ["wiki", "notes"], // 可指定要显示的文件夹
-          title: "热门文章 🔥",
+          title: "🔗 引用最多",
           limit: 10,
           showCount: true,
         }),

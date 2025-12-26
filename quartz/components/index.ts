@@ -33,7 +33,7 @@ import HomepageStyles from "./HomepageStyles"
 import FolderCards from "./FolderCards"
 import FeaturedTags from "./FeaturedTags"
 import RecentUpdates from "./RecentUpdates"
-import PopularArticles from "./PopularArticles"
+import MostLinked from "./MostLinked"
 
 export {
   ArticleTitle,
@@ -71,5 +71,5 @@ export {
   FolderCards,
   FeaturedTags,
   RecentUpdates,
-  PopularArticles,
+  MostLinked,
 }

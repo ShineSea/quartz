@@ -2,9 +2,9 @@ import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } fro
 import { FullSlug, resolveRelative } from "../util/path"
 import style from "./styles/homepage.scss"
 
-export interface PopularArticlesOptions {
+export interface MostLinkedOptions {
   /**
-   * 标题（默认为"🔥 热门文章"）
+   * 标题（默认为"🔗 引用最多"）
    */
   title?: string
   /**
@@ -17,16 +17,16 @@ export interface PopularArticlesOptions {
   showCount?: boolean
 }
 
-const defaultOptions: PopularArticlesOptions = {
-  title: "🔥 热门文章",
+const defaultOptions: MostLinkedOptions = {
+  title: "🔗 引用最多",
   limit: 10,
   showCount: true,
 }
 
-export default ((userOpts?: Partial<PopularArticlesOptions>) => {
-  const opts: PopularArticlesOptions = { ...defaultOptions, ...userOpts }
+export default ((userOpts?: Partial<MostLinkedOptions>) => {
+  const opts: MostLinkedOptions = { ...defaultOptions, ...userOpts }
 
-  const PopularArticles: QuartzComponent = (props: QuartzComponentProps) => {
+  const MostLinked: QuartzComponent = (props: QuartzComponentProps) => {
     const { allFiles, fileData } = props
 
     // 统计每个文件的反向链接数量
@@ -97,6 +97,6 @@ export default ((userOpts?: Partial<PopularArticlesOptions>) => {
     )
   }
 
-  PopularArticles.css = style
-  return PopularArticles
+  MostLinked.css = style
+  return MostLinked
 }) satisfies QuartzComponentConstructor
