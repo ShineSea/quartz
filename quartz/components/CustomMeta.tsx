@@ -5,7 +5,7 @@ import { FullSlug, FilePath } from "../util/path"
 import { i18n } from "../i18n"
 import style from "./styles/contentMeta.scss"
 
-// 定义内置元数据字段列表（移除 aliases，让它可以显示）
+// 定义内置元数据字段列表，这里的字段都不会显示
 const builtinFields = [
   'title',
   'tags',
@@ -13,6 +13,7 @@ const builtinFields = [
   'modified',
   'created',
   'published',
+  'date',
   'description',
   'socialDescription',
   'publish',
@@ -164,12 +165,12 @@ CustomMeta.css = `
   font-weight: var(--meta-key-font-weight, bold);
   width: 120px;
   vertical-align: top;
-  padding: 0.25rem 0.5rem 0.25rem 0.25rem;
+  padding: 0.5rem 0.75rem 0.5rem 0.5rem;
   border-right: 1px solid var(--gray);
 }
 
 .custom-meta-value {
-  padding: 0.25rem 0.5rem;
+  padding: 0.5rem 0.75rem;
   vertical-align: top;
   word-wrap: break-word;
   word-break: break-word;
