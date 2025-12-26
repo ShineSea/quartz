@@ -2,13 +2,14 @@ import { QuartzComponent, QuartzComponentConstructor, QuartzComponentProps } fro
 import { classNames } from "../util/lang"
 import { resolveRelative, slugifyFilePath } from "../util/path"
 import { FullSlug, FilePath } from "../util/path"
+import { i18n } from "../i18n"
 import style from "./styles/contentMeta.scss"
 
-// 定义内置元数据字段列表
+// 定义内置元数据字段列表（移除 aliases，让它可以显示）
 const builtinFields = [
   'title',
   'tags',
-  'aliases',
+  // 'aliases', // 移除，让 aliases 可以显示
   'modified',
   'created',
   'published',
@@ -23,9 +24,16 @@ const builtinFields = [
   'comments'
 ]
 
+// 定义需要以标签形式渲染的字段（紧凑型列表）
+const tagStyleFields = ['aliases', 'alias', 'tags', 'tag']
+
 const CustomMeta: QuartzComponent = ({ fileData, displayClass, cfg }: QuartzComponentProps) => {
   const frontmatter = fileData.frontmatter
   if (!frontmatter) return null
+
+  // 从i18n读取字段名翻译
+  const translations = i18n(cfg.locale)
+  const fieldNameMap = translations.components.customMeta.fieldNames
 
   // 获取所有非内置的元数据字段（包括值为空的字段）
   const customFields = Object.keys(frontmatter).filter(
@@ -38,15 +46,29 @@ const CustomMeta: QuartzComponent = ({ fileData, displayClass, cfg }: QuartzComp
   }
 
   // 处理值，支持链接渲染
-  const renderValue = (value: any): any => {
+  const renderValue = (value: any, fieldKey: string): any => {
     if (Array.isArray(value)) {
-      return (
-        <ul class="custom-meta-list">
-          {value.map((item, index) => (
-            <li key={index}>{renderValue(item)}</li>
-          ))}
-        </ul>
-      )
+      // 检查是否需要以标签形式渲染
+      if (tagStyleFields.includes(fieldKey)) {
+        return (
+          <div class="custom-meta-tags">
+            {value.map((item, index) => (
+              <span key={index} class="custom-meta-tag">
+                {renderValue(item, fieldKey)}
+              </span>
+            ))}
+          </div>
+        )
+      } else {
+        // 普通列表渲染（每项一行）
+        return (
+          <ul class="custom-meta-list">
+            {value.map((item, index) => (
+              <li key={index}>{renderValue(item, fieldKey)}</li>
+            ))}
+          </ul>
+        )
+      }
     } else if (typeof value === 'string') {
       // 检查是否为内部链接格式 [[link]]
       const wikilinkRegex = /\[\[([^\]]+)\]\]/g
@@ -98,12 +120,14 @@ const CustomMeta: QuartzComponent = ({ fileData, displayClass, cfg }: QuartzComp
         <tbody>
           {customFields.map(field => {
             const value = frontmatter[field]
+            // 翻译字段名（如果有翻译则使用翻译，否则使用原始名称）
+            const displayName = fieldNameMap[field] || field.replace(/_/g, ' ')
             // 渲染所有字段，包括空值
             return (
               <tr key={field}>
-                <td class="custom-meta-key">{field.replace(/_/g, ' ')}</td>
+                <td class="custom-meta-key">{displayName}</td>
                 <td class="custom-meta-value">
-                  {(value === null || value === '') ? '' : renderValue(value)}
+                  {(value === null || value === '') ? '' : renderValue(value, field)}
                 </td>
               </tr>
             )
@@ -183,6 +207,31 @@ CustomMeta.css = `
 
 .custom-meta .internal:hover {
   color: var(--tertiary);
+}
+
+.custom-meta-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.custom-meta-tag {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  background: var(--highlight);
+  border-radius: 12px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.custom-meta-tag a {
+  text-decoration: none;
+}
+
+.custom-meta-tag:hover {
+  background: var(--lightgray);
 }
 `
 
