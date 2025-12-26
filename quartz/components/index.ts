@@ -31,6 +31,7 @@ import BorderBox from "./BorderBox"
 import HomepageTitle from "./HomepageTitle"
 import FolderCards from "./FolderCards"
 import FeaturedTags from "./FeaturedTags"
+import RecentUpdates from "./RecentUpdates"
 
 export {
   ArticleTitle,
@@ -66,4 +67,5 @@ export {
   HomepageTitle,
   FolderCards,
   FeaturedTags,
+  RecentUpdates,
 }

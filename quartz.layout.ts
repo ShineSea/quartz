@@ -56,7 +56,7 @@ export const defaultContentPageLayout: PageLayout = {
         component: Component.FolderCards({
           // topFolders: ["wiki", "notes"], // 可指定要显示的文件夹
           showFolderCount: true,
-          title: "📂 内容分类",
+          title: "内容分类 📂",
         }),
       }),
       condition: (page) => page.fileData.slug === "index",
@@ -67,7 +67,18 @@ export const defaultContentPageLayout: PageLayout = {
         component: Component.FeaturedTags({
           // featuredTags: ["JavaScript", "Python"], // 可指定要显示的标签
           // maxTags: 20, // 最多显示20个标签
-          title: "🏷️ 常用标签",
+          title: "常用标签 🏷️",
+        }),
+      }),
+      condition: (page) => page.fileData.slug === "index",
+    }),
+    // 在首页显示最近更新（使用 BorderBox 包裹）
+    Component.ConditionalRender({
+      component: Component.BorderBox({
+        component: Component.RecentUpdates({
+          title: "最近更新 🕒",
+          limit: 10, // 显示最近10篇文章
+          showDate: true, // 显示日期
         }),
       }),
       condition: (page) => page.fileData.slug === "index",
