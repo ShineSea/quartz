@@ -88,7 +88,7 @@ export const defaultContentPageLayout: PageLayout = {
       component: Component.BorderBox({
         component: Component.MostLinked({
           // topFolders: ["wiki", "notes"], // 可指定要显示的文件夹
-          title: "🔗 引用最多",
+          title: "引用最多 📌",
           limit: 10,
           showCount: true,
         }),
