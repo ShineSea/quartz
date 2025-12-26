@@ -15,16 +15,16 @@ const config: QuartzConfig = {
     pageTitleSuffix: "",
     enableSPA: true,
     enablePopovers: true,
-    analytics: {
-      provider: "plausible",
-    },
+    // 关闭在线分析
+    analytics: null,
     locale: "zh-CN",
-    baseUrl: "quartz.jzhao.xyz",
+    // 注意此处配置，影响静态资源加载路径。
+    baseUrl: "localhost:8181",
     ignorePatterns: ["private", "templates", ".obsidian", "journals"],
     defaultDateType: "date",
     theme: {
       fontOrigin: "googleFonts",
-      cdnCaching: true,
+      cdnCaching: false,
       typography: {
         header: "Schibsted Grotesk",
         body: "Source Sans Pro",

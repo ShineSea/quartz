@@ -86,7 +86,7 @@ export default ((userOpts?: Partial<MostLinkedOptions>) => {
                 </div>
                 {opts.showCount && backlinkCount > 0 && (
                   <div class="recent-update-date popular-count">
-                    {backlinkCount} 个链接
+                    {backlinkCount} 个引用
                   </div>
                 )}
               </a>
