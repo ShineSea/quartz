@@ -369,21 +369,8 @@ export async function handleBuild(argv) {
       argv.baseDir = "/" + argv.baseDir
     }
 
-    // 改为根据命令行参数决定是否执行初始构建
-    // await build(clientRefresh)
-    // API 模式：不执行初始构建
-    if (argv.api) {
-      console.log(styleText("cyan", "🔌 API mode enabled - waiting for rebuild requests..."))
-      console.log(
-        styleText(
-          "grey",
-          `Send POST to http://${argv.host}:${argv.port}/api/rebuild to trigger build`,
-        ),
-      )
-    } else {
-      // 普通模式：执行初始构建
-      await build(clientRefresh)
-    }
+    await build(clientRefresh)
+
     const server = http.createServer(async (req, res) => {
       // 提取文件路径的辅助函数
       const extractFilePath = (message) => {

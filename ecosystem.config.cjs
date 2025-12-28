@@ -1,17 +1,25 @@
+const { watch } = require("fs");
+
 // ecosystem.config.cjs
 module.exports = {
   apps: [{
     name: "my-quartz",
     script: "./quartz/bootstrap-cli.mjs",
-    args: "build --serve --api --port 8181 --wsPort 3002",
+    args: "build --serve --api --port 8765 --wsPort 3002",
     interpreter: "node",
     interpreter_args: "--no-deprecation",
     // 与 bootstrap-cli.mjs 第一行的 shebang #!/usr/bin/env -S node --no-deprecation 保持一致
     cwd: "./",
-    watch: false,
+
     env: {
       NODE_ENV: "production",
     },
+
+    watch: false,
+    // 启用文件监听，当文件变化时自动重启
+    // watch: true,
+    // watch_delay: 5000,  // 文件监听延迟 5 秒
+    // ignore_watch: ["./logs", "./public", "./content"],
 
     // 日志配置
     error_file: "./logs/quartz-error.log",

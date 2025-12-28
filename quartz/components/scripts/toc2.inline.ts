@@ -107,16 +107,13 @@ function setupToc2() {
   
   // 监听文章内容区域的点击事件
   const articleContent = document.querySelector("article.popover-hint") || document.querySelector("article")
-  console.log("[TOC2] Article content element found:", articleContent)
   
   if (articleContent) {
     const clickHandler = (event: Event) => {
       const target = event.target as Element
-      console.log("[TOC2] Article clicked:", target)
       
       // 查找点击位置最近的标题
       const slug = findNearestHeadingSlug(target)
-      console.log("[TOC2] Found nearest heading slug:", slug)
       
       if (slug) {
         highlightTocItem(slug)
@@ -125,9 +122,9 @@ function setupToc2() {
     
     articleContent.addEventListener("click", clickHandler)
     window.addCleanup(() => articleContent.removeEventListener("click", clickHandler))
-    console.log("[TOC2] Article click listener attached")
+    // console.log("[TOC2] Article click listener attached")
   } else {
-    console.warn("[TOC2] Article content element not found!")
+    // console.warn("[TOC2] Article content element not found!")
   }
 }
 

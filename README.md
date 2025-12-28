@@ -58,4 +58,9 @@ npx quartz build --serve --api --port 8181 --wsPort 3002
 
 - YAML中的系统内置键（title、tags），要小写，才能识别！
 
+## PM2进程管理
+https://pm2.node.org.cn/docs/usage/restart-strategies/
+
+
+## 常见问题
 
