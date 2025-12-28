@@ -139,7 +139,10 @@ export const defaultContentPageLayout: PageLayout = {
 // components for pages that display lists of pages  (e.g. tags or folders)
 export const defaultListPageLayout: PageLayout = {
   beforeBody: [
-    Component.Breadcrumbs(),
+    Component.Breadcrumbs({
+        // spacerSymbol: "→", 
+        rootName: "首页"
+      }),
     Component.ArticleTitle(),
     Component.ContentMeta({ showReadingTime: false }),
   ],

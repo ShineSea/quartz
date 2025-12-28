@@ -174,6 +174,7 @@ ${stylesheet.join("\n\n")}
   --explorer-folder-border-radius: ${styles.explorer.folderBorderRadius};
   --explorer-folder-bg-hover: ${styles.explorer.folderBackgroundHover};
   --explorer-item-spacing: ${styles.explorer.itemSpacing};
+  --explorer-file-font-size: ${styles.explorer.fileFontSize};
   
   /* CustomMeta 容器样式变量 */
   --meta-container-padding: ${styles.customMeta.containerPadding};

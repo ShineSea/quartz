@@ -28,6 +28,7 @@ export interface StyleTheme {
     folderBorderRadius: string        // 圆角
     folderBackgroundHover: string     // 悬停背景色
     itemSpacing: string               // 项目间距（影响布局视觉）
+    fileFontSize: string              // 文件字体大小
   }
   
   // CustomMeta 元数据样式
