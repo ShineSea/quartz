@@ -17,6 +17,9 @@ export interface Options {
   folderClickBehavior: "collapse" | "link"
   useSavedState: boolean
   accordionMode: boolean  // 手风琴模式：点开一个文件夹时自动收起其他
+  // 性能优化配置
+  lazyLoad: boolean  // 懒加载：默认只渲染文件夹，展开时才渲染文件
+  renderThreshold: number  // 当文件夹内文件数超过此阈值时启用懒加载（0 = 始终启用）
   sortFn: (a: FileTrieNode, b: FileTrieNode) => number
   filterFn: (node: FileTrieNode) => boolean
   mapFn: (node: FileTrieNode) => void
@@ -28,6 +31,8 @@ const defaultOptions: Options = {
   folderClickBehavior: "link",
   useSavedState: true,
   accordionMode: false,  // 默认关闭手风琴模式
+  lazyLoad: true,  // 默认启用懒加载优化
+  renderThreshold: 0,  // 0 表示始终启用懒加载
   mapFn: (node) => {
     return node
   },
@@ -72,6 +77,8 @@ export default ((userOpts?: Partial<Options>) => {
         data-collapsed={opts.folderDefaultState}
         data-savestate={opts.useSavedState}
         data-accordion={opts.accordionMode}
+        data-lazyload={opts.lazyLoad}
+        data-renderthreshold={opts.renderThreshold}
         data-data-fns={JSON.stringify({
           order: opts.order,
           sortFn: opts.sortFn.toString(),

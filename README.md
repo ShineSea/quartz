@@ -57,6 +57,7 @@ npx quartz build --serve --api --port 8181 --wsPort 3002
 npx quartz build --serve --api --port 8181 --wsPort 3002 -d 'E:\Notes\Obsidian_Notes\content\'
 ```
 
+npx quartz build --serve --api --port 8181 --wsPort 3002 -d 'E:\Notes\Obsidian_Notes\testwork' --concurrency 4
 
 ### 
 

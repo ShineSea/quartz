@@ -9,6 +9,8 @@ interface ParsedOptions {
   folderDefaultState: "collapsed" | "open"
   useSavedState: boolean
   accordionMode: boolean
+  lazyLoad: boolean
+  renderThreshold: number
   sortFn: (a: FileTrieNode, b: FileTrieNode) => number
   filterFn: (node: FileTrieNode) => boolean
   mapFn: (node: FileTrieNode) => void
@@ -62,6 +64,21 @@ function toggleFolder(evt: MouseEvent) {
 
   const wasOpen = childFolderContainer.classList.contains("open")
   childFolderContainer.classList.toggle("open")
+
+  // **懒加载逻辑**: 如果这是首次展开且启用了懒加载，现在加载文件节点
+  if (!wasOpen && folderContainer.dataset.isLazy === "true" && !folderContainer.dataset.loaded) {
+    // 🔍 调试日志：开始动态加载
+    console.log(`[动态加载] 开始加载文件夹 "${folderContainer.dataset.folderpath}" 的文件节点`)
+    const startTime = performance.now()
+    
+    loadLazyChildren(folderContainer, childFolderContainer)
+    
+    const endTime = performance.now()
+    console.log(`[动态加载] 完成加载，耗时 ${(endTime - startTime).toFixed(2)}ms`)
+    
+    // 标记为已加载，避免重复渲染
+    folderContainer.dataset.loaded = "true"
+  }
 
   // Collapse folder container
   const isCollapsed = !childFolderContainer.classList.contains("open")
@@ -120,6 +137,49 @@ function createFileNode(currentSlug: FullSlug, node: FileTrieNode): HTMLLIElemen
   return li
 }
 
+/**
+ * 懒加载子节点：从 DOM 中读取存储的子节点数据并渲染文件节点
+ */
+function loadLazyChildren(folderContainer: HTMLElement, folderOuter: HTMLElement) {
+  const lazyChildrenData = folderContainer.dataset.lazyChildren
+  if (!lazyChildrenData) return
+
+  const childrenData = JSON.parse(lazyChildrenData) as Array<{
+    slug: FullSlug
+    displayName: string
+    isFolder: boolean
+  }>
+
+  const ul = folderOuter.querySelector("ul") as HTMLUListElement
+  if (!ul) return
+
+  // 获取当前 slug（从页面上下文获取）
+  const currentSlug = (window.location.pathname.slice(1) || "index") as FullSlug
+
+  // 渲染所有文件节点（文件夹已经渲染过了）
+  const fileNodes = childrenData.filter(child => !child.isFolder)
+  
+  const fragment = document.createDocumentFragment()
+  for (const fileData of fileNodes) {
+    // 使用轻量级数据创建 FileTrieNode 对象
+    const fileNode = {
+      slug: fileData.slug,
+      displayName: fileData.displayName,
+      isFolder: false,
+      children: [],
+    } as unknown as FileTrieNode
+    
+    const li = createFileNode(currentSlug, fileNode)
+    fragment.appendChild(li)
+  }
+
+  // 将文件节点插入到 ul 中（插入到文件夹节点后面）
+  ul.appendChild(fragment)
+  
+  // 🔍 调试日志：加载了多少文件
+  console.log(`[动态加载] 成功渲染 ${fileNodes.length} 个文件节点`)
+}
+
 function createFolderNode(
   currentSlug: FullSlug,
   node: FileTrieNode,
@@ -176,17 +236,51 @@ function createFolderNode(
     folderOuter.classList.add("open")
   }
 
+  // **懒加载逻辑**: 判断是否需要延迟渲染文件节点
+  const shouldLazyLoad = opts.lazyLoad && (
+    opts.renderThreshold === 0 || 
+    node.children.filter(child => !child.isFolder).length > opts.renderThreshold
+  )
+
+  // 将子节点数据存储到 DOM 元素上，供后续动态加载使用
+  if (shouldLazyLoad) {
+    // 将子节点数据序列化存储（简单存储文件信息）
+    const childrenData = node.children.map(child => ({
+      slug: child.slug,
+      displayName: child.displayName,
+      isFolder: child.isFolder,
+    }))
+    folderContainer.dataset.lazyChildren = JSON.stringify(childrenData)
+    // 标记这个文件夹使用懒加载
+    folderContainer.dataset.isLazy = "true"
+    
+    // 🔍 调试日志：懒加载生效
+    console.log(`[懒加载] 文件夹 "${node.displayName}" 延迟渲染 ${childrenData.filter(c => !c.isFolder).length} 个文件`)
+  }
+
   // 递归创建子节点
   let hasActiveChild = false
   for (const child of node.children) {
-    const childNode = child.isFolder
-      ? createFolderNode(currentSlug, child, opts)
-      : createFileNode(currentSlug, child)
-    ul.appendChild(childNode)
+    let childNode: HTMLLIElement | null = null
     
-    // 检查子节点是否有活跃项
-    if (childNode.dataset.isActive === "true" || childNode.classList.contains("in-active-path")) {
-      hasActiveChild = true
+    if (child.isFolder) {
+      // 文件夹总是渲染
+      childNode = createFolderNode(currentSlug, child, opts)
+    } else if (!shouldLazyLoad || isCurrentFolderOrAncestor) {
+      // 文件节点：只在以下情况渲染
+      // 1. 未启用懒加载
+      // 2. 当前路径在该文件夹下（预加载优化）
+      childNode = createFileNode(currentSlug, child)
+    }
+    // 否则跳过渲染，等待用户展开文件夹时再渲染
+    
+    if (childNode) {
+      ul.appendChild(childNode)
+      
+      // 检查子节点是否有活跃项
+      if (childNode.dataset.isActive === "true" || childNode.classList.contains("in-active-path")) {
+        hasActiveChild = true
+      }
     }
   }
 
@@ -209,6 +303,8 @@ async function setupExplorer2(currentSlug: FullSlug) {
       folderDefaultState: (explorer.dataset.collapsed || "collapsed") as "collapsed" | "open",
       useSavedState: explorer.dataset.savestate === "true",
       accordionMode: explorer.dataset.accordion === "true",
+      lazyLoad: explorer.dataset.lazyload === "true",
+      renderThreshold: parseInt(explorer.dataset.renderthreshold || "0"),
       order: dataFns.order || ["filter", "map", "sort"],
       sortFn: new Function("return " + (dataFns.sortFn || "undefined"))(),
       filterFn: new Function("return " + (dataFns.filterFn || "undefined"))(),
