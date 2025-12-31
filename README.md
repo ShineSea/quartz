@@ -59,7 +59,17 @@ npx quartz build --serve --api --port 8181 --wsPort 3002 -d 'E:\Notes\Obsidian_N
 
 npx quartz build --serve --api --port 8181 --wsPort 3002 -d 'E:\Notes\Obsidian_Notes\testwork' --concurrency 4
 
-### 
+### Nginx
+
+先在nginx文件夹下：
+```
+start nginx
+```
+
+重新载入配置文件：
+```
+nginx -s reload
+```
 
 ## 配置说明
 
