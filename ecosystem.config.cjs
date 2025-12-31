@@ -5,7 +5,8 @@ module.exports = {
   apps: [{
     name: "my-quartz",
     script: "./quartz/bootstrap-cli.mjs",
-    args: "build --serve --api --port 8765 --wsPort 3002",
+    args: "build --serve --api --port 8765 --wsPort 3002 -d 'E:\\Notes\\Obsidian_Notes\\content'",
+    // args: "build --serve --api --port 8765 --wsPort 3002 -d 'C:\\Project\\test_mysql_netcore_8081_r1\\wwwroot\\quartz\\content'",
     interpreter: "node",
     interpreter_args: "--no-deprecation",
     // 与 bootstrap-cli.mjs 第一行的 shebang #!/usr/bin/env -S node --no-deprecation 保持一致

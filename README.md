@@ -44,10 +44,19 @@ npx quartz build --serve --port 8765
 ```
 
 端口监控（而非文件变动监控）：
+
 ```bash
 npx quartz build --serve --api --port 8181 --wsPort 3002
 ```
+
 一共会占用2个端口。
+
+选择项目外的文件夹：
+
+```bash
+npx quartz build --serve --api --port 8181 --wsPort 3002 -d 'E:\Notes\Obsidian_Notes\content\'
+```
+
 
 ### 
 
