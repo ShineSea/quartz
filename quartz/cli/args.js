@@ -82,6 +82,12 @@ export const BuildArgv = {
     default: false,
     describe: "enable API for external build triggering",
   },
+  // 新增：启用增量构建
+  incremental: {
+    boolean: true,
+    default: false,
+    describe: "enable incremental build",
+  },
   baseDir: {
     string: true,
     default: "",

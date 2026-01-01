@@ -21,6 +21,9 @@ import { getStaticResourcesFromPlugins } from "./plugins"
 import { randomIdNonSecure } from "./util/random"
 import { ChangeEvent } from "./plugins/types"
 import { minimatch } from "minimatch"
+// 改动 1：在文件顶部新增导入
+import { stat, writeFile, readFile, mkdir, unlink } from "fs/promises"
+import { existsSync } from "fs"
 
 type ContentMap = Map<
   FilePath,
@@ -41,6 +44,82 @@ type BuildData = {
   changesSinceLastBuild: Record<FilePath, ChangeEvent["type"]>
   lastBuildMs: number
 }
+
+// 改动 2：在 BuildData 类型后新增缓存相关类型和函数
+// 缓存清单类型
+type CacheManifest = {
+  version: string
+  files: {
+    [key: string]: {
+      mtime: number
+      slug?: string
+      links?: string[]
+    }
+  }
+}
+
+// 加载缓存
+async function loadCacheManifest(output: string): Promise<CacheManifest> {
+  const cacheFile = path.join(output, ".quartz-cache.json")
+  try {
+    if (existsSync(cacheFile)) {
+      const data = await readFile(cacheFile, "utf-8")
+      return JSON.parse(data)
+    }
+  } catch (err) {
+    console.log("Failed to load cache, will do full build")
+  }
+  return { version: "1.0", files: {} }
+}
+
+// 保存缓存
+async function saveCacheManifest(output: string, manifest: CacheManifest): Promise<void> {
+  const cacheFile = path.join(output, ".quartz-cache.json")
+  await writeFile(cacheFile, JSON.stringify(manifest, null, 2))
+}
+
+// 检测变化的文件
+async function detectChangedFiles(
+  allFiles: string[],
+  cache: CacheManifest,
+  directory: string,
+): Promise<{ changed: string[]; deleted: string[] }> {
+  // 返回两个列表
+  const changed: string[] = []
+  const deleted: string[] = []
+
+  // 构建当前文件的 Set，方便查找
+  const currentFilesSet = new Set<string>()
+
+  // 检测新增和修改
+  for (const fp of allFiles) {
+    if (!fp.endsWith(".md")) continue
+
+    const fullPath = joinSegments(directory, fp) as FilePath
+    currentFilesSet.add(fullPath)
+
+    try {
+      const stats = await stat(fullPath)
+      const cached = cache.files[fullPath]
+
+      if (!cached || cached.mtime !== stats.mtimeMs) {
+        changed.push(fullPath)
+      }
+    } catch {
+      changed.push(fullPath)
+    }
+  }
+
+  // 检测删除：缓存中有但当前不存在的
+  for (const cachedPath of Object.keys(cache.files)) {
+    if (!currentFilesSet.has(cachedPath)) {
+      deleted.push(cachedPath as FilePath)
+    }
+  }
+
+  return { changed, deleted }
+}
+// 改动2结束
 
 async function buildQuartz(argv: Argv, mut: Mutex, clientRefresh: () => void) {
   const ctx: BuildCtx = {
@@ -94,11 +173,177 @@ async function buildQuartz(argv: Argv, mut: Mutex, clientRefresh: () => void) {
   if (argv.watch) {
     ctx.incremental = true
     return startWatching(ctx, mut, parsedFiles, clientRefresh)
-  }
-  else if (argv.api) {
+  } else if (argv.api) {
     return startApi(ctx, mut, parsedFiles, clientRefresh)
   }
 }
+
+// 改动 3：新增增量构建函数
+// 增量构建函数
+async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () => void) {
+  console.log("[DEBUG] buildQuartzIncremental started")
+  const ctx: BuildCtx = {
+    buildId: randomIdNonSecure(),
+    argv,
+    cfg,
+    allSlugs: [],
+    allFiles: [],
+    incremental: true, // 开启增量模式
+  }
+
+  console.log("[DEBUG] ctx initialized")
+
+  const perf = new PerfTimer()
+  const output = argv.output
+  console.log(`[DEBUG] output directory: ${output}`)
+
+  if (argv.verbose) {
+    const pluginCount = Object.values(cfg.plugins).flat().length
+    console.log(`Loaded ${pluginCount} plugins`)
+  }
+
+  // const release = await mut.acquire()
+  console.log("[DEBUG] mutex acquired")
+
+  // 加载缓存
+  perf.addEvent("load-cache")
+  const cacheManifest = await loadCacheManifest(output)
+  console.log(`Loaded cache in ${perf.timeSince("load-cache")}`)
+
+  // 确保输出目录存在（不删除）
+  await mkdir(output, { recursive: true })
+
+  // 获取所有文件
+  perf.addEvent("glob")
+  const allFiles = await glob("**/*.*", argv.directory, cfg.configuration.ignorePatterns)
+  const markdownPaths = allFiles.filter((fp) => fp.endsWith(".md")).sort()
+  console.log(`Found ${markdownPaths.length} input files in ${perf.timeSince("glob")}`)
+
+  // 检测变化的文件
+  perf.addEvent("detect-changes")
+  const { changed: changedFilePaths, deleted: deletedFilePaths } = await detectChangedFiles(
+    markdownPaths,
+    cacheManifest,
+    argv.directory,
+  )
+  console.log(`Detected ${changedFilePaths.length} changed, ${deletedFilePaths.length} deleted`)
+
+  // 设置上下文
+  // const filePaths = markdownPaths.map((fp) => joinSegments(argv.directory, fp) as FilePath)
+  ctx.allFiles = allFiles
+  ctx.allSlugs = allFiles.map((fp) => slugifyFilePath(fp as FilePath))
+
+  // 如果没有任何变化，跳过构建
+  if (changedFilePaths.length === 0 && deletedFilePaths.length === 0) {
+    console.log(styleText("green", "No changes detected, skipping build"))
+    // release()
+    return
+  }
+
+  // 只解析变化的文件
+  perf.addEvent("parse")
+  const parsedFiles = await parseMarkdown(ctx, changedFilePaths as FilePath[])
+  console.log(`Parsed ${parsedFiles.length} files in ${perf.timeSince("parse")}`)
+
+  // 构造 changeEvents，包括删除事件
+  const changeEvents: ChangeEvent[] = [
+    // 新增和修改
+    ...parsedFiles.map(([_tree, file]) => ({
+      type: "change" as const,
+      path: file.data.relativePath!,
+      file: file,
+    })),
+    // 删除
+    ...deletedFilePaths.map((fp) => ({
+      type: "delete" as const,
+      path: path.relative(argv.directory, fp) as FilePath,
+      // file 字段留空，因为文件已经不存在了
+    })),
+  ]
+  console.log(`Change events: ${changeEvents.length} total`)
+
+  // 更新缓存清单
+  // 更新缓存清单
+  for (const [_tree, file] of parsedFiles) {
+    const fp = joinSegments(argv.directory, file.data.relativePath!) as FilePath
+    try {
+      const stats = await stat(fp)
+      cacheManifest.files[fp] = {
+        mtime: stats.mtimeMs,
+        slug: file.data.slug,
+        links: file.data.links || [],
+      }
+    } catch {}
+  }
+
+  // 从缓存中移除删除的文件
+  for (const deletedPath of deletedFilePaths) {
+    delete cacheManifest.files[deletedPath]
+  }
+
+  // 保存缓存
+  await saveCacheManifest(output, cacheManifest)
+
+  const filteredContent = filterContent(ctx, parsedFiles)
+
+  // 使用增量 emit（复制自 rebuild 函数）
+  perf.addEvent("emit")
+  let emittedFiles = 0
+  const staticResources = getStaticResourcesFromPlugins(ctx)
+
+  for (const emitter of cfg.plugins.emitters) {
+    try {
+      const emitFn = emitter.partialEmit ?? emitter.emit
+      const emitted = await emitFn(ctx, filteredContent, staticResources, changeEvents)
+
+      if (emitted === null) continue
+
+      if (Symbol.asyncIterator in emitted) {
+        for await (const file of emitted) {
+          emittedFiles++
+          if (argv.verbose) {
+            console.log(`[emit:${emitter.name}] ${file}`)
+          }
+        }
+      } else {
+        emittedFiles += emitted.length
+        if (argv.verbose) {
+          for (const file of emitted) {
+            console.log(`[emit:${emitter.name}] ${file}`)
+          }
+        }
+      }
+    } catch (err) {
+      trace(`Failed to emit from plugin \`${emitter.name}\``, err as Error)
+    }
+  }
+
+  console.log(`Emitted ${emittedFiles} files in ${perf.timeSince("emit")}`)
+
+  // 保存缓存
+  await saveCacheManifest(output, cacheManifest)
+
+  // 删除对应的输出文件
+  for (const deletedPath of deletedFilePaths) {
+    try {
+      const relativePath = path.relative(argv.directory, deletedPath)
+      const slug = slugifyFilePath(relativePath as FilePath)
+      const outputPath = path.join(output, slug + ".html")
+      await unlink(outputPath)
+      console.log(`Deleted output: ${outputPath}`)
+    } catch (err) {
+      // 文件可能已经不存在，忽略错误
+    }
+  }
+
+  console.log(styleText("green", `Done incremental build in ${perf.timeSince()}`))
+  // release()
+
+  if (argv.watch) {
+    return startWatching(ctx, mut, parsedFiles, clientRefresh)
+  }
+}
+// 改动3结束
 
 async function startWatching(
   ctx: BuildCtx,
@@ -229,17 +474,17 @@ async function startApi(
     async fullBuild() {
       await buildQuartz(argv, mut, clientRefresh)
     },
-    
+
     // 手动触发增量构建
     async incrementalBuild(changes: ChangeEvent[]) {
       await rebuild(changes, clientRefresh, buildData)
     },
-    
+
     // 关闭构建进程
     async close() {
       // 如果有watcher，关闭它
       return Promise.resolve()
-    }
+    },
   }
 }
 
@@ -367,6 +612,12 @@ async function rebuild(changes: ChangeEvent[], clientRefresh: () => void, buildD
 
 export default async (argv: Argv, mut: Mutex, clientRefresh: () => void) => {
   try {
+    // 改动 4：修改 export default
+    // 如果启用增量构建（通过新的命令行参数判断）
+    if (argv.incremental) {
+      return await buildQuartzIncremental(argv, mut, clientRefresh)
+    }
+    // 改动4结束
     return await buildQuartz(argv, mut, clientRefresh)
   } catch (err) {
     // API 模式下，直接抛出错误，不再重复处理
