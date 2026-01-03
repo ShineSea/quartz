@@ -91,6 +91,11 @@ async function loadCacheManifest(output: string): Promise<CacheManifest> {
   try {
     if (existsSync(cacheFile)) {
       const data = await readFile(cacheFile, "utf-8")
+      const parsed = JSON.parse(data)
+      // 确保有 graph 字段
+      if (!parsed.graph) {
+        parsed.graph = { nodes: {}, edges: [] }
+      }
       return JSON.parse(data)
     }
   } catch (err) {
@@ -295,7 +300,7 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
   }
 
   // const release = await mut.acquire()
-  console.log("[DEBUG] mutex acquired")
+  // console.log("[DEBUG] mutex acquired")
 
   // 加载缓存
   perf.addEvent("load-cache")
@@ -324,6 +329,7 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
   // const filePaths = markdownPaths.map((fp) => joinSegments(argv.directory, fp) as FilePath)
   ctx.allFiles = allFiles
   ctx.allSlugs = allFiles.map((fp) => slugifyFilePath(fp as FilePath))
+  ctx.graphCache = cacheManifest.graph
 
   // 如果没有任何变化，跳过构建
   if (changedFilePaths.length === 0 && deletedFilePaths.length === 0) {
@@ -374,62 +380,56 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
   console.log(`Restored ${restoredCount} files from cache in ${perf.timeSince("restore-cache")}`)
   console.log(`Total files for processing: ${allParsedFiles.length}`)
 
-  
   // 更新图谱缓存
   perf.addEvent("update-graph")
   updateGraphCache(cacheManifest.graph, parsedFiles, deletedFilePaths, cacheManifest)
-
-  ctx.graphCache = cacheManifest.graph
   console.log(`Updated graph cache in ${perf.timeSince("update-graph")}`)
 
   // ===== 结束新增 =====
   // 构造 changeEvents，包括删除事件
   const changeEvents: ChangeEvent[] = [
     // 新增和修改
-    ...parsedFiles.map(([_tree, file]) => ({
-      type: "change" as const,
-      path: file.data.relativePath!,
-      file: file,
-    })),
-    // 删除
-    ...deletedFilePaths.map((fp) => ({
-      type: "delete" as const,
-      path: path.relative(argv.directory, fp) as FilePath,
-      // file 字段留空，因为文件已经不存在了
-    })),
+    ...parsedFiles.map(
+      ([_tree, file]): ChangeEvent => ({
+        type: "change" as const,
+        path: file.data.relativePath!,
+        file: file,
+      }),
+    ),
+    // 删除 - 从缓存恢复元数据用于生成虚拟节点
+    ...deletedFilePaths.map((fp): ChangeEvent => {
+      const cached = cacheManifest.files[fp]
+
+      if (cached?.metadata) {
+        const virtualFile = defaultProcessedContent({
+          slug: cached.metadata.slug as FullSlug,
+          relativePath: cached.metadata.relativePath as FilePath,
+          filePath: cached.metadata.relativePath as FilePath,
+          links: cached.metadata.links as SimpleSlug[],
+          tags: cached.metadata.tags,
+          title: cached.metadata.title || cached.metadata.slug,
+          description: cached.metadata.description,
+          frontmatter: {
+            title: cached.metadata.title || cached.metadata.slug,
+            ...(cached.metadata.frontmatter || {}),
+          },
+        })
+
+        return {
+          type: "delete" as const,
+          path: path.relative(argv.directory, fp) as FilePath,
+          file: virtualFile[1],
+        }
+      }
+
+      return {
+        type: "delete" as const,
+        path: path.relative(argv.directory, fp) as FilePath,
+        file: undefined, // 显式设置为 undefined
+      }
+    }),
   ]
   console.log(`Change events: ${changeEvents.length} total`)
-
-
-  // 更新缓存清单
-  for (const [_tree, file] of parsedFiles) {
-    const fp = joinSegments(argv.directory, file.data.relativePath!) as FilePath
-    try {
-      const stats = await stat(fp)
-      cacheManifest.files[fp] = {
-        mtime: stats.mtimeMs,
-        // slug: file.data.slug,
-        // links: file.data.links || [],
-        metadata: {
-          slug: file.data.slug!,
-          title: file.data.title as string,
-          links: file.data.links || [],
-          tags: Array.isArray(file.data.tags) ? file.data.tags : [],
-          frontmatter: file.data.frontmatter || {},
-          description: file.data.description,
-          relativePath: file.data.relativePath,
-        },
-      }
-    } catch {}
-  }
-
-  // 从缓存中移除删除的文件
-  for (const deletedPath of deletedFilePaths) {
-    delete cacheManifest.files[deletedPath]
-  }
-
-  // 保存缓存
-  await saveCacheManifest(output, cacheManifest)
 
   const filteredContent = filterContent(ctx, allParsedFiles)
 
@@ -467,8 +467,34 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
 
   console.log(`Emitted ${emittedFiles} files in ${perf.timeSince("emit")}`)
 
-  // 保存缓存
-  await saveCacheManifest(output, cacheManifest)
+  // 更新缓存清单
+  for (const [_tree, file] of parsedFiles) {
+    const fp = joinSegments(argv.directory, file.data.relativePath!) as FilePath
+    try {
+      const stats = await stat(fp)
+      cacheManifest.files[fp] = {
+        mtime: stats.mtimeMs,
+        // slug: file.data.slug,
+        // links: file.data.links || [],
+        metadata: {
+          slug: file.data.slug!,
+          title: file.data.title as string,
+          links: file.data.links || [],
+          tags: Array.isArray(file.data.tags) ? file.data.tags : [],
+          frontmatter: file.data.frontmatter || {},
+          description: file.data.description,
+          relativePath: file.data.relativePath,
+        },
+      }
+    } catch (err) {
+      console.error(`Failed to cache ${fp}:`, err)
+    }
+  }
+
+  // 从缓存中移除删除的文件
+  for (const deletedPath of deletedFilePaths) {
+    delete cacheManifest.files[deletedPath]
+  }
 
   // 删除对应的输出文件
   for (const deletedPath of deletedFilePaths) {
@@ -482,6 +508,9 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
       // 文件可能已经不存在，忽略错误
     }
   }
+
+  // 保存缓存
+  await saveCacheManifest(output, cacheManifest)
 
   console.log(styleText("green", `Done incremental build in ${perf.timeSince()}`))
   // release()
