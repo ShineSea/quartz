@@ -9,7 +9,7 @@ import { parseMarkdown } from "./processors/parse"
 import { filterContent } from "./processors/filter"
 import { emitContent } from "./processors/emit"
 import cfg from "../quartz.config"
-import { FilePath, joinSegments, slugifyFilePath } from "./util/path"
+import { FilePath, joinSegments, slugifyFilePath, FullSlug, SimpleSlug } from "./util/path"
 import chokidar from "chokidar"
 import { ProcessedContent } from "./plugins/vfile"
 import { Argv, BuildCtx } from "./util/ctx"
@@ -24,6 +24,7 @@ import { minimatch } from "minimatch"
 // 改动 1：在文件顶部新增导入
 import { stat, writeFile, readFile, mkdir, unlink } from "fs/promises"
 import { existsSync } from "fs"
+import { defaultProcessedContent } from "./plugins/vfile"
 
 type ContentMap = Map<
   FilePath,
@@ -52,8 +53,17 @@ type CacheManifest = {
   files: {
     [key: string]: {
       mtime: number
-      slug?: string
-      links?: string[]
+      // slug?: string
+      // links?: string[]
+      metadata?: {
+        slug: string
+        title?: string
+        links: string[]
+        tags?: string[]
+        frontmatter?: Record<string, any>
+        description?: string
+        relativePath?: string
+      }
     }
   }
 }
@@ -244,7 +254,44 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
   perf.addEvent("parse")
   const parsedFiles = await parseMarkdown(ctx, changedFilePaths as FilePath[])
   console.log(`Parsed ${parsedFiles.length} files in ${perf.timeSince("parse")}`)
+  // ===== 新增：从缓存恢复未变化的文件 =====
+  perf.addEvent("restore-cache")
+  const allParsedFiles: ProcessedContent[] = [...parsedFiles]
 
+  // 获取所有当前存在的文件路径
+  const allCurrentFiles = markdownPaths.map((fp) => joinSegments(argv.directory, fp) as FilePath)
+  const changedSet = new Set(changedFilePaths)
+  const deletedSet = new Set(deletedFilePaths)
+
+  let restoredCount = 0
+  for (const filepath of allCurrentFiles) {
+    // 如果文件没变化且没被删除，从缓存恢复
+    if (!changedSet.has(filepath) && !deletedSet.has(filepath)) {
+      const cached = cacheManifest.files[filepath]
+      if (cached?.metadata) {
+        // 用缓存的元数据重建 ProcessedContent
+        const restoredContent = defaultProcessedContent({
+          slug: cached.metadata.slug as FullSlug,
+          relativePath: cached.metadata.relativePath as FilePath,
+          filePath: cached.metadata.relativePath as FilePath,  // 添加这行
+          links: cached.metadata.links as SimpleSlug[],
+          tags: cached.metadata.tags,
+          frontmatter: {
+            title: cached.metadata.title || cached.metadata.slug,
+            ...(cached.metadata.frontmatter || {}),
+          },
+          title: cached.metadata.title,
+          description: cached.metadata.description,
+        })
+        allParsedFiles.push(restoredContent)
+        restoredCount++
+      }
+    }
+  }
+
+  console.log(`Restored ${restoredCount} files from cache in ${perf.timeSince("restore-cache")}`)
+  console.log(`Total files for processing: ${allParsedFiles.length}`)
+  // ===== 结束新增 =====
   // 构造 changeEvents，包括删除事件
   const changeEvents: ChangeEvent[] = [
     // 新增和修改
@@ -263,15 +310,23 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
   console.log(`Change events: ${changeEvents.length} total`)
 
   // 更新缓存清单
-  // 更新缓存清单
   for (const [_tree, file] of parsedFiles) {
     const fp = joinSegments(argv.directory, file.data.relativePath!) as FilePath
     try {
       const stats = await stat(fp)
       cacheManifest.files[fp] = {
         mtime: stats.mtimeMs,
-        slug: file.data.slug,
-        links: file.data.links || [],
+        // slug: file.data.slug,
+        // links: file.data.links || [],
+        metadata: {
+          slug: file.data.slug!,
+          title: file.data.title as string,
+          links: file.data.links || [],
+          tags: Array.isArray(file.data.tags) ? file.data.tags : [],
+          frontmatter: file.data.frontmatter || {},
+          description: file.data.description,
+          relativePath: file.data.relativePath,
+        },
       }
     } catch {}
   }
@@ -284,7 +339,7 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
   // 保存缓存
   await saveCacheManifest(output, cacheManifest)
 
-  const filteredContent = filterContent(ctx, parsedFiles)
+  const filteredContent = filterContent(ctx, allParsedFiles)
 
   // 使用增量 emit（复制自 rebuild 函数）
   perf.addEvent("emit")
