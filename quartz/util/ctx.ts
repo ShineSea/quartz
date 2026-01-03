@@ -24,6 +24,25 @@ export type BuildTimeTrieData = QuartzPluginData & {
   filePath: string
 }
 
+// 新增
+
+// 在 ctx.ts 顶部添加类型定义
+export type GraphNode = {
+  slug: string
+  title: string
+  tags: string[]
+}
+ 
+export type GraphEdge = {
+  source: string
+  target: string
+}
+ 
+export type GraphCache = {
+  nodes: Record<string, GraphNode>
+  edges: GraphEdge[]
+}
+ 
 export interface BuildCtx {
   buildId: string
   argv: Argv
@@ -31,6 +50,18 @@ export interface BuildCtx {
   allSlugs: FullSlug[]
   allFiles: FilePath[]
   trie?: FileTrieNode<BuildTimeTrieData>
+  incremental: boolean
+  graphCache?: GraphCache  // 新增
+}
+
+export interface BuildCtx {
+  buildId: string
+  argv: Argv
+  cfg: QuartzConfig
+  allSlugs: FullSlug[]
+  allFiles: FilePath[]
+  trie?: FileTrieNode<BuildTimeTrieData>
+  graphCache?: GraphCache  // 新增图谱缓存 
   incremental: boolean
 }
 

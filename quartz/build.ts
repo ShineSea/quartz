@@ -47,6 +47,22 @@ type BuildData = {
 }
 
 // 改动 2：在 BuildData 类型后新增缓存相关类型和函数
+type GraphNode = {
+  slug: string
+  title: string
+  tags: string[]
+}
+
+type GraphEdge = {
+  source: string // slug
+  target: string // slug
+}
+
+type GraphCache = {
+  nodes: Record<string, GraphNode> // key 是 slug
+  edges: GraphEdge[]
+}
+
 // 缓存清单类型
 type CacheManifest = {
   version: string
@@ -66,6 +82,7 @@ type CacheManifest = {
       }
     }
   }
+  graph: GraphCache // 新增图谱缓存
 }
 
 // 加载缓存
@@ -79,7 +96,7 @@ async function loadCacheManifest(output: string): Promise<CacheManifest> {
   } catch (err) {
     console.log("Failed to load cache, will do full build")
   }
-  return { version: "1.0", files: {} }
+  return { version: "1.0", files: {}, graph: { nodes: {}, edges: [] } }
 }
 
 // 保存缓存
@@ -93,10 +110,10 @@ async function detectChangedFiles(
   allFiles: string[],
   cache: CacheManifest,
   directory: string,
-): Promise<{ changed: string[]; deleted: string[] }> {
+): Promise<{ changed: string[]; deleted: FilePath[] }> {
   // 返回两个列表
-  const changed: string[] = []
-  const deleted: string[] = []
+  const changed: FilePath[] = []
+  const deleted: FilePath[] = []
 
   // 构建当前文件的 Set，方便查找
   const currentFilesSet = new Set<string>()
@@ -130,6 +147,67 @@ async function detectChangedFiles(
   return { changed, deleted }
 }
 // 改动2结束
+
+// 新增图谱更新函数
+function updateGraphCache(
+  graphCache: GraphCache,
+  changedFiles: ProcessedContent[],
+  deletedFiles: FilePath[],
+  cacheManifest: CacheManifest,
+) {
+  // 处理删除的文件
+  for (const filePath of deletedFiles) {
+    const cached = cacheManifest.files[filePath]
+    const slug = cached?.metadata?.slug
+    if (!slug) continue
+
+    // 删除节点
+    delete graphCache.nodes[slug]
+
+    // 删除所有从这个节点出发的边（outgoing edges）
+    graphCache.edges = graphCache.edges.filter((edge) => edge.source !== slug)
+
+    // 注意：不删除指向这个节点的边（incoming edges）
+    // 因为其他文件仍然链接到它，需要生成虚拟节点
+  }
+
+  // 处理变化的文件
+  for (const [_tree, file] of changedFiles) {
+    const slug = file.data.slug!
+
+    // 更新节点
+    graphCache.nodes[slug] = {
+      slug: slug,
+      title: (file.data.title as string) || slug,
+      tags: Array.isArray(file.data.tags) ? file.data.tags : [],
+    }
+
+    // 删除这个文件的旧边（outgoing edges）
+    graphCache.edges = graphCache.edges.filter((edge) => edge.source !== slug)
+
+    // 添加新边
+    const links = file.data.links || []
+    for (const target of links) {
+      graphCache.edges.push({
+        source: slug,
+        target: target,
+      })
+
+      // 如果目标节点不存在，创建虚拟节点
+      if (!graphCache.nodes[target]) {
+        graphCache.nodes[target] = {
+          slug: target,
+          title: target,
+          tags: [],
+        }
+      }
+    }
+  }
+
+  console.log(
+    `Graph updated: ${Object.keys(graphCache.nodes).length} nodes, ${graphCache.edges.length} edges`,
+  )
+}
 
 async function buildQuartz(argv: Argv, mut: Mutex, clientRefresh: () => void) {
   const ctx: BuildCtx = {
@@ -198,6 +276,10 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
     cfg,
     allSlugs: [],
     allFiles: [],
+    graphCache: {
+      nodes: {},
+      edges: [],
+    },
     incremental: true, // 开启增量模式
   }
 
@@ -273,7 +355,7 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
         const restoredContent = defaultProcessedContent({
           slug: cached.metadata.slug as FullSlug,
           relativePath: cached.metadata.relativePath as FilePath,
-          filePath: cached.metadata.relativePath as FilePath,  // 添加这行
+          filePath: cached.metadata.relativePath as FilePath, // 添加这行
           links: cached.metadata.links as SimpleSlug[],
           tags: cached.metadata.tags,
           frontmatter: {
@@ -291,6 +373,15 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
 
   console.log(`Restored ${restoredCount} files from cache in ${perf.timeSince("restore-cache")}`)
   console.log(`Total files for processing: ${allParsedFiles.length}`)
+
+  
+  // 更新图谱缓存
+  perf.addEvent("update-graph")
+  updateGraphCache(cacheManifest.graph, parsedFiles, deletedFilePaths, cacheManifest)
+
+  ctx.graphCache = cacheManifest.graph
+  console.log(`Updated graph cache in ${perf.timeSince("update-graph")}`)
+
   // ===== 结束新增 =====
   // 构造 changeEvents，包括删除事件
   const changeEvents: ChangeEvent[] = [
@@ -308,6 +399,7 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
     })),
   ]
   console.log(`Change events: ${changeEvents.length} total`)
+
 
   // 更新缓存清单
   for (const [_tree, file] of parsedFiles) {
