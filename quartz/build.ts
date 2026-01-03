@@ -511,7 +511,7 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
 
   // 保存缓存
   await saveCacheManifest(output, cacheManifest)
-
+  await emitContent(ctx, filteredContent)
   console.log(styleText("green", `Done incremental build in ${perf.timeSince()}`))
   // release()
 

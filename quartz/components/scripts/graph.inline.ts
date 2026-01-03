@@ -17,7 +17,14 @@ import {
 import { Text, Graphics, Application, Container, Circle } from "pixi.js"
 import { Group as TweenGroup, Tween as Tweened } from "@tweenjs/tween.js"
 import { registerEscapeHandler, removeAllChildren } from "./util"
-import { FullSlug, SimpleSlug, getFullSlug, resolveRelative, simplifySlug } from "../../util/path"
+import {
+  FullSlug,
+  SimpleSlug,
+  getFullSlug,
+  resolveRelative,
+  simplifySlug,
+  FilePath,
+} from "../../util/path"
 import { D3Config } from "../Graph"
 
 type GraphicsInfo = {
@@ -89,27 +96,68 @@ async function renderGraph(graph: HTMLElement, fullSlug: FullSlug) {
     enableRadial,
   } = JSON.parse(graph.dataset["cfg"]!) as D3Config
 
-  const data: Map<SimpleSlug, ContentDetails> = new Map(
-    Object.entries<ContentDetails>(await fetchData).map(([k, v]) => [
-      simplifySlug(k as FullSlug),
-      v,
-    ]),
-  )
-  const links: SimpleLinkData[] = []
-  const tags: SimpleSlug[] = []
-  const validLinks = new Set(data.keys())
+  // const data: Map<SimpleSlug, ContentDetails> = new Map(
+  //   Object.entries<ContentDetails>(await fetchData).map(([k, v]) => [
+  //     simplifySlug(k as FullSlug),
+  //     v,
+  //   ]),
+  // )
+  // const links: SimpleLinkData[] = []
+  let data: Map<SimpleSlug, ContentDetails> = new Map()
+  let links: SimpleLinkData[] = []
 
-  const tweens = new Map<string, TweenNode>()
-  for (const [source, details] of data.entries()) {
-    const outgoing = details.links ?? []
+  // 新增：尝试使用图谱缓存
+  try {
+    const baseUrl = new URL(document.location.href).origin
+    const graphResponse = await fetch(`${baseUrl}/static/graph.json`)
+    const graphData = await graphResponse.json()
 
-    for (const dest of outgoing) {
-      if (validLinks.has(dest)) {
-        links.push({ source: source, target: dest })
+    // 从图谱缓存构建数据
+    data = new Map(
+      Object.entries(graphData.nodes).map(([slug, node]: [string, any]) => [
+        simplifySlug(slug as FullSlug),
+        {
+          slug: slug as FullSlug,
+          filePath: "" as FilePath,
+          title: node.title,
+          links: [], // links 从 edges 构建
+          tags: node.tags,
+          content: "",
+        },
+      ]),
+    )
+
+    // 从 edges 构建 links
+    links = graphData.edges.map((edge: any) => ({
+      source: simplifySlug(edge.source as FullSlug),
+      target: simplifySlug(edge.target as FullSlug),
+    }))
+  } catch (error) {
+    // 降级：使用 contentIndex.json（全量构建时）
+    console.log("Using contentIndex fallback for graph")
+    const contentIndex: Map<SimpleSlug, ContentDetails> = new Map(
+      Object.entries<ContentDetails>(await fetchData).map(([k, v]) => [
+        simplifySlug(k as FullSlug),
+        v,
+      ]),
+    )
+    data = contentIndex
+
+    // 从 contentIndex 计算 links（保留原逻辑）
+    for (const [source, details] of data.entries()) {
+      const outgoing = details.links ?? []
+      for (const dest of outgoing) {
+        if (data.has(dest)) {
+          links.push({ source: source, target: dest })
+        }
       }
     }
+  }
 
-    if (showTags) {
+  // tags 处理
+  const tags: SimpleSlug[] = []
+  if (showTags) {
+    for (const [source, details] of data.entries()) {
       const localTags = details.tags
         .filter((tag) => !removeTags.includes(tag))
         .map((tag) => simplifySlug(("tags/" + tag) as FullSlug))
@@ -121,6 +169,32 @@ async function renderGraph(graph: HTMLElement, fullSlug: FullSlug) {
       }
     }
   }
+  const validLinks = new Set(data.keys())
+
+  const tweens = new Map<string, TweenNode>()
+
+  // 删除这段（因为 links 已经在上面构建好了）
+  // for (const [source, details] of data.entries()) {
+  //   const outgoing = details.links ?? []
+
+  //   for (const dest of outgoing) {
+  //     if (validLinks.has(dest)) {
+  //       links.push({ source: source, target: dest })
+  //     }
+  //   }
+
+  //   if (showTags) {
+  //     const localTags = details.tags
+  //       .filter((tag) => !removeTags.includes(tag))
+  //       .map((tag) => simplifySlug(("tags/" + tag) as FullSlug))
+
+  //     tags.push(...localTags.filter((tag) => !tags.includes(tag)))
+
+  //     for (const tag of localTags) {
+  //       links.push({ source: source, target: tag })
+  //     }
+  //   }
+  // }
 
   const neighbourhood = new Set<SimpleSlug>()
   const wl: (SimpleSlug | "__SENTINEL")[] = [slug, "__SENTINEL"]

@@ -73,6 +73,7 @@ const config: QuartzConfig = {
       Plugin.Static(),
       Plugin.Favicon(),
       Plugin.NotFoundPage(),
+      Plugin.GraphData(),  // 新增，输出知识图谱数据
       // Comment out CustomOgImages to speed up build time
       // Plugin.CustomOgImages(),
     ],
