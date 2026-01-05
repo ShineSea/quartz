@@ -46,43 +46,55 @@ type BuildData = {
   lastBuildMs: number
 }
 
-// 改动 2：在 BuildData 类型后新增缓存相关类型和函数
+// ==================== 图谱中心的增量构建架构 ====================
+// 核心思想：所有内容抽象为图谱节点和边，通过图谱差异计算实现增量构建
+
+// 节点类型枚举
+type NodeType = "entity" | "virtual" | "tag"
+
+// 图谱节点（统一所有类型的节点）
 type GraphNode = {
-  slug: string
-  title: string
-  tags: string[]
+  slug: string           // 节点唯一标识
+  type: NodeType         // 节点类型
+  title: string          // 显示标题
+  tags: string[]         // 关联的标签
+  
+  // 仅实体节点（来自 MD 文件）有以下字段
+  filePath?: string      // 源文件路径（用于 mtime 检测）
+  mtime?: number         // 文件修改时间
+  description?: string   // 描述
+  frontmatter?: Record<string, any>  // 前置元数据
 }
 
+// 边类型枚举
+type EdgeType = "link" | "tag" | "backlink"
+
+// 图谱边（关系）
 type GraphEdge = {
-  source: string // slug
-  target: string // slug
+  source: string  // 源节点 slug
+  target: string  // 目标节点 slug
+  type: EdgeType  // 边的类型
 }
 
+// 图谱缓存（核心数据结构）
 type GraphCache = {
-  nodes: Record<string, GraphNode> // key 是 slug
-  edges: GraphEdge[]
+  nodes: Record<string, GraphNode>  // key 是 slug
+  edges: GraphEdge[]                // 所有关系
 }
 
-// 缓存清单类型
+// 缓存清单
 type CacheManifest = {
   version: string
-  files: {
-    [key: string]: {
-      mtime: number
-      // slug?: string
-      // links?: string[]
-      metadata?: {
-        slug: string
-        title?: string
-        links: string[]
-        tags?: string[]
-        frontmatter?: Record<string, any>
-        description?: string
-        relativePath?: string
-      }
-    }
-  }
-  graph: GraphCache // 新增图谱缓存
+  graph: GraphCache  // 图谱就是一切！
+}
+
+// 影响分析结果：记录哪些节点受到变化影响
+type ImpactAnalysis = {
+  directChanges: Set<string>      // 直接变化的节点（文件增删改）
+  affectedByLinks: Set<string>    // 因为链接关系受影响的节点
+  affectedByTags: Set<string>     // 因为标签关系受影响的节点
+  affectedByBacklinks: Set<string> // 因为反向链接受影响的节点
+  allAffected: Set<string>        // 所有受影响的节点（union）
 }
 
 // 加载缓存
@@ -96,12 +108,12 @@ async function loadCacheManifest(output: string): Promise<CacheManifest> {
       if (!parsed.graph) {
         parsed.graph = { nodes: {}, edges: [] }
       }
-      return JSON.parse(data)
+      return parsed
     }
   } catch (err) {
     console.log("Failed to load cache, will do full build")
   }
-  return { version: "1.0", files: {}, graph: { nodes: {}, edges: [] } }
+  return { version: "1.0", graph: { nodes: {}, edges: [] } }
 }
 
 // 保存缓存
@@ -110,31 +122,34 @@ async function saveCacheManifest(output: string, manifest: CacheManifest): Promi
   await writeFile(cacheFile, JSON.stringify(manifest, null, 2))
 }
 
-// 检测变化的文件
+// 检测变化的文件（基于图谱节点）
 async function detectChangedFiles(
   allFiles: string[],
   cache: CacheManifest,
   directory: string,
 ): Promise<{ changed: string[]; deleted: FilePath[] }> {
-  // 返回两个列表
   const changed: FilePath[] = []
   const deleted: FilePath[] = []
 
-  // 构建当前文件的 Set，方便查找
+  // 构建当前文件的 Set
   const currentFilesSet = new Set<string>()
+  const pathToSlugMap = new Map<string, string>()  // 文件路径 -> slug 映射
 
   // 检测新增和修改
   for (const fp of allFiles) {
     if (!fp.endsWith(".md")) continue
 
     const fullPath = joinSegments(directory, fp) as FilePath
+    const slug = slugifyFilePath(fp as FilePath)
     currentFilesSet.add(fullPath)
+    pathToSlugMap.set(fullPath, slug)
 
     try {
       const stats = await stat(fullPath)
-      const cached = cache.files[fullPath]
+      const cachedNode = cache.graph.nodes[slug]
 
-      if (!cached || cached.mtime !== stats.mtimeMs) {
+      // 通过 mtime 判断是否变化
+      if (!cachedNode || cachedNode.mtime !== stats.mtimeMs) {
         changed.push(fullPath)
       }
     } catch {
@@ -142,10 +157,12 @@ async function detectChangedFiles(
     }
   }
 
-  // 检测删除：缓存中有但当前不存在的
-  for (const cachedPath of Object.keys(cache.files)) {
-    if (!currentFilesSet.has(cachedPath)) {
-      deleted.push(cachedPath as FilePath)
+  // 检测删除：缓存中的 entity 节点但当前不存在的
+  for (const [slug, node] of Object.entries(cache.graph.nodes)) {
+    if (node.type === "entity" && node.filePath) {
+      if (!currentFilesSet.has(node.filePath)) {
+        deleted.push(node.filePath as FilePath)
+      }
     }
   }
 
@@ -153,65 +170,208 @@ async function detectChangedFiles(
 }
 // 改动2结束
 
-// 新增图谱更新函数
+// 更新图谱缓存（核心逻辑）
 function updateGraphCache(
   graphCache: GraphCache,
   changedFiles: ProcessedContent[],
   deletedFiles: FilePath[],
-  cacheManifest: CacheManifest,
 ) {
-  // 处理删除的文件
+  // ==== 1. 处理删除的文件 ====
   for (const filePath of deletedFiles) {
-    const cached = cacheManifest.files[filePath]
-    const slug = cached?.metadata?.slug
-    if (!slug) continue
+    // 通过 filePath 找到对应的 slug
+    const deletedNode = Object.values(graphCache.nodes).find(n => n.filePath === filePath)
+    if (!deletedNode) continue
+    
+    const slug = deletedNode.slug
 
-    // 删除节点
-    delete graphCache.nodes[slug]
+    // 删除该节点（如果是 entity 节点）
+    if (deletedNode.type === "entity") {
+      delete graphCache.nodes[slug]
+    }
 
-    // 删除所有从这个节点出发的边（outgoing edges）
+    // 删除所有从这个节点出去的边
     graphCache.edges = graphCache.edges.filter((edge) => edge.source !== slug)
 
     // 注意：不删除指向这个节点的边（incoming edges）
     // 因为其他文件仍然链接到它，需要生成虚拟节点
+    // 将节点类型改为 virtual（如果有其他节点链接到它）
+    const hasIncomingEdges = graphCache.edges.some(edge => edge.target === slug)
+    if (hasIncomingEdges) {
+      graphCache.nodes[slug] = {
+        slug,
+        type: "virtual",
+        title: slug,  // 虚拟节点使用 slug 作为标题
+        tags: [],
+      }
+    }
   }
 
-  // 处理变化的文件
+  // ==== 2. 处理变化/新增的文件 ====
   for (const [_tree, file] of changedFiles) {
     const slug = file.data.slug!
+    const links = file.data.links || []
+    const tags = Array.isArray(file.data.tags) ? file.data.tags : []
 
-    // 更新节点
+    // 更新/创建 entity 节点
     graphCache.nodes[slug] = {
-      slug: slug,
+      slug,
+      type: "entity",
       title: (file.data.title as string) || slug,
-      tags: Array.isArray(file.data.tags) ? file.data.tags : [],
+      tags,
+      filePath: file.data.relativePath!,
+      mtime: 0,  // 先设为 0，后续由保存缓存时更新
+      description: file.data.description,
+      frontmatter: file.data.frontmatter || {},
     }
 
-    // 删除这个文件的旧边（outgoing edges）
-    graphCache.edges = graphCache.edges.filter((edge) => edge.source !== slug)
+    // 删除这个节点的旧边（outgoing edges）
+    graphCache.edges = graphCache.edges.filter(
+      (edge) => edge.source !== slug || edge.type !== "link"
+    )
 
-    // 添加新边
-    const links = file.data.links || []
+    // 添加新的链接边
     for (const target of links) {
       graphCache.edges.push({
         source: slug,
         target: target,
+        type: "link",
       })
 
       // 如果目标节点不存在，创建虚拟节点
       if (!graphCache.nodes[target]) {
         graphCache.nodes[target] = {
           slug: target,
+          type: "virtual",
           title: target,
           tags: [],
         }
       }
     }
+
+    // 处理 tag 边（删除旧的 tag 边，添加新的）
+    graphCache.edges = graphCache.edges.filter(
+      (edge) => edge.source !== slug || edge.type !== "tag"
+    )
+    
+    for (const tag of tags) {
+      const tagSlug = `tags/${tag}`
+      
+      // 确保 tag 节点存在
+      if (!graphCache.nodes[tagSlug]) {
+        graphCache.nodes[tagSlug] = {
+          slug: tagSlug,
+          type: "tag",
+          title: tag,
+          tags: [],
+        }
+      }
+      
+      // 添加 tag 边
+      graphCache.edges.push({
+        source: slug,
+        target: tagSlug,
+        type: "tag",
+      })
+    }
   }
 
   console.log(
-    `Graph updated: ${Object.keys(graphCache.nodes).length} nodes, ${graphCache.edges.length} edges`,
+    `Graph updated: ${Object.keys(graphCache.nodes).length} nodes ` +
+    `(${Object.values(graphCache.nodes).filter(n => n.type === "entity").length} entity, ` +
+    `${Object.values(graphCache.nodes).filter(n => n.type === "virtual").length} virtual, ` +
+    `${Object.values(graphCache.nodes).filter(n => n.type === "tag").length} tag), ` +
+    `${graphCache.edges.length} edges`
   )
+}
+
+// ==================== 增量构建的核心：影响分析 ====================
+// 分析哪些节点受到变化影响，需要重新生成
+function analyzeImpact(
+  graph: GraphCache,
+  changedSlugs: Set<string>,
+  deletedSlugs: Set<string>,
+): ImpactAnalysis {
+  const directChanges = new Set<string>([...changedSlugs, ...deletedSlugs])
+  const affectedByLinks = new Set<string>()
+  const affectedByTags = new Set<string>()
+  const affectedByBacklinks = new Set<string>()
+
+  // ==== 1. 分析链接影响 ====
+  // 如果 A -> B，B 变化了，A 需要更新（因为 A 显示到 B 的链接）
+  for (const slug of directChanges) {
+    for (const edge of graph.edges) {
+      if (edge.type === "link") {
+        // 如果有链接指向变化的节点
+        if (edge.target === slug) {
+          affectedByLinks.add(edge.source)
+        }
+        // 如果变化的节点链接到其他节点
+        if (edge.source === slug) {
+          affectedByLinks.add(edge.target)
+        }
+      }
+    }
+  }
+
+  // ==== 2. 分析标签影响 ====
+  // 如果一个文件的标签变了，该标签页需要更新
+  for (const slug of changedSlugs) {
+    const node = graph.nodes[slug]
+    if (node && node.type === "entity") {
+      for (const tag of node.tags) {
+        const tagSlug = `tags/${tag}`
+        affectedByTags.add(tagSlug)
+      }
+    }
+  }
+  
+  // 删除的文件也要更新其相关的标签页
+  for (const slug of deletedSlugs) {
+    // 查找该节点的所有 tag 边
+    for (const edge of graph.edges) {
+      if (edge.source === slug && edge.type === "tag") {
+        affectedByTags.add(edge.target)
+      }
+    }
+  }
+
+  // ==== 3. 分析反向链接影响 ====
+  // 如果 A -> B，A 变化了，B 的反向链接列表需要更新
+  for (const slug of directChanges) {
+    for (const edge of graph.edges) {
+      if (edge.type === "link" && edge.source === slug) {
+        affectedByBacklinks.add(edge.target)
+      }
+      if (edge.type === "link" && edge.target === slug) {
+        affectedByBacklinks.add(edge.source)
+      }
+    }
+  }
+
+  // ==== 4. 汇总所有受影响的节点 ====
+  const allAffected = new Set<string>([
+    ...directChanges,
+    ...affectedByLinks,
+    ...affectedByTags,
+    ...affectedByBacklinks,
+  ])
+
+  console.log(
+    `Impact Analysis: ` +
+    `${directChanges.size} direct changes, ` +
+    `${affectedByLinks.size} affected by links, ` +
+    `${affectedByTags.size} affected by tags, ` +
+    `${affectedByBacklinks.size} affected by backlinks, ` +
+    `Total: ${allAffected.size} nodes need rebuild`
+  )
+
+  return {
+    directChanges,
+    affectedByLinks,
+    affectedByTags,
+    affectedByBacklinks,
+    allAffected,
+  }
 }
 
 async function buildQuartz(argv: Argv, mut: Mutex, clientRefresh: () => void) {
@@ -342,7 +502,7 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
   perf.addEvent("parse")
   const parsedFiles = await parseMarkdown(ctx, changedFilePaths as FilePath[])
   console.log(`Parsed ${parsedFiles.length} files in ${perf.timeSince("parse")}`)
-  // ===== 新增：从缓存恢复未变化的文件 =====
+  // ===== 从缓存恢复未变化的文件 =====
   perf.addEvent("restore-cache")
   const allParsedFiles: ProcessedContent[] = [...parsedFiles]
 
@@ -355,22 +515,32 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
   for (const filepath of allCurrentFiles) {
     // 如果文件没变化且没被删除，从缓存恢复
     if (!changedSet.has(filepath) && !deletedSet.has(filepath)) {
-      const cached = cacheManifest.files[filepath]
-      if (cached?.metadata) {
-        // 用缓存的元数据重建 ProcessedContent
+      const relativePath = path.relative(argv.directory, filepath) as FilePath
+      const slug = slugifyFilePath(relativePath as FilePath)
+      const cachedNode = cacheManifest.graph.nodes[slug]
+      
+      if (cachedNode && cachedNode.type === "entity") {
+        // 用缓存的节点数据重建 ProcessedContent
         const restoredContent = defaultProcessedContent({
-          slug: cached.metadata.slug as FullSlug,
-          relativePath: cached.metadata.relativePath as FilePath,
-          filePath: cached.metadata.relativePath as FilePath, // 添加这行
-          links: cached.metadata.links as SimpleSlug[],
-          tags: cached.metadata.tags,
+          slug: slug as FullSlug,
+          relativePath: relativePath,
+          filePath: relativePath,
+          links: [], // links 从 edges 中恢复
+          tags: cachedNode.tags,
           frontmatter: {
-            title: cached.metadata.title || cached.metadata.slug,
-            ...(cached.metadata.frontmatter || {}),
+            title: cachedNode.title || slug,
+            ...(cachedNode.frontmatter || {}),
           },
-          title: cached.metadata.title,
-          description: cached.metadata.description,
+          title: cachedNode.title,
+          description: cachedNode.description,
         })
+        
+        // 从边中恢复 links
+        const links = cacheManifest.graph.edges
+          .filter(edge => edge.source === slug && edge.type === "link")
+          .map(edge => edge.target as SimpleSlug)
+        restoredContent[1].data.links = links
+        
         allParsedFiles.push(restoredContent)
         restoredCount++
       }
@@ -382,11 +552,24 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
 
   // 更新图谱缓存
   perf.addEvent("update-graph")
-  updateGraphCache(cacheManifest.graph, parsedFiles, deletedFilePaths, cacheManifest)
+  updateGraphCache(cacheManifest.graph, parsedFiles, deletedFilePaths)
   console.log(`Updated graph cache in ${perf.timeSince("update-graph")}`)
 
-  // ===== 结束新增 =====
-  // 构造 changeEvents，包括删除事件
+  // ==================== 核心改进：基于图谱的影响分析 ====================
+  // 计算哪些节点受到变化影响
+  perf.addEvent("impact-analysis")
+  const changedSlugs = new Set(parsedFiles.map(([_, file]) => file.data.slug!))
+  const deletedSlugs = new Set(
+    deletedFilePaths.map(fp => {
+      const relativePath = path.relative(argv.directory, fp) as FilePath
+      return slugifyFilePath(relativePath)
+    })
+  )
+  
+  const impact = analyzeImpact(cacheManifest.graph, changedSlugs, deletedSlugs)
+  console.log(`Impact analysis completed in ${perf.timeSince("impact-analysis")}`)
+
+  // 构造增强的 changeEvents（包含影响分析结果）
   const changeEvents: ChangeEvent[] = [
     // 新增和修改
     ...parsedFiles.map(
@@ -396,40 +579,94 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
         file: file,
       }),
     ),
-    // 删除 - 从缓存恢复元数据用于生成虚拟节点
+    // 删除 - 从图谱节点恢复元数据
     ...deletedFilePaths.map((fp): ChangeEvent => {
-      const cached = cacheManifest.files[fp]
+      const relativePath = path.relative(argv.directory, fp) as FilePath
+      const slug = slugifyFilePath(relativePath)
+      const cachedNode = cacheManifest.graph.nodes[slug]
 
-      if (cached?.metadata) {
+      if (cachedNode && cachedNode.type === "entity") {
+        // 从边中恢复 links
+        const links = cacheManifest.graph.edges
+          .filter(edge => edge.source === slug && edge.type === "link")
+          .map(edge => edge.target as SimpleSlug)
+          
         const virtualFile = defaultProcessedContent({
-          slug: cached.metadata.slug as FullSlug,
-          relativePath: cached.metadata.relativePath as FilePath,
-          filePath: cached.metadata.relativePath as FilePath,
-          links: cached.metadata.links as SimpleSlug[],
-          tags: cached.metadata.tags,
-          title: cached.metadata.title || cached.metadata.slug,
-          description: cached.metadata.description,
+          slug: slug as FullSlug,
+          relativePath: relativePath,
+          filePath: relativePath,
+          links: links,
+          tags: cachedNode.tags,
+          title: cachedNode.title || slug,
+          description: cachedNode.description,
           frontmatter: {
-            title: cached.metadata.title || cached.metadata.slug,
-            ...(cached.metadata.frontmatter || {}),
+            title: cachedNode.title || slug,
+            ...(cachedNode.frontmatter || {}),
           },
         })
 
         return {
           type: "delete" as const,
-          path: path.relative(argv.directory, fp) as FilePath,
+          path: relativePath,
           file: virtualFile[1],
         }
       }
 
       return {
         type: "delete" as const,
-        path: path.relative(argv.directory, fp) as FilePath,
-        file: undefined, // 显式设置为 undefined
+        path: relativePath,
+        file: undefined,
       }
     }),
   ]
-  console.log(`Change events: ${changeEvents.length} total`)
+  
+  // 为所有受影响的节点生成虚拟 changeEvent
+  // 这样 emitter 的 partialEmit 可以知道哪些页面需要重新生成
+  for (const slug of impact.allAffected) {
+    // 跳过已经在 changeEvents 中的节点
+    if (changedSlugs.has(slug) || deletedSlugs.has(slug)) continue
+    
+    const node = cacheManifest.graph.nodes[slug]
+    if (!node) continue
+    
+    // 为受影响的节点创建 changeEvent
+    if (node.type === "entity" && node.filePath) {
+      const relativePath = path.relative(argv.directory, node.filePath) as FilePath
+      const links = cacheManifest.graph.edges
+        .filter(edge => edge.source === slug && edge.type === "link")
+        .map(edge => edge.target as SimpleSlug)
+      
+      const virtualFile = defaultProcessedContent({
+        slug: slug as FullSlug,
+        relativePath: relativePath,
+        filePath: relativePath,
+        links: links,
+        tags: node.tags,
+        title: node.title || slug,
+        description: node.description,
+        frontmatter: {
+          title: node.title || slug,
+          ...(node.frontmatter || {}),
+        },
+      })
+      
+      changeEvents.push({
+        type: "change" as const,
+        path: relativePath,
+        file: virtualFile[1],
+      })
+    } else if (node.type === "tag") {
+      // 标签节点也需要通知 emitter 更新
+      const tagPath = `${slug}.md` as FilePath
+      changeEvents.push({
+        type: "change" as const,
+        path: tagPath,
+        file: undefined,  // 标签页由 tagPage emitter 生成，不需要 file
+      })
+    }
+  }
+  
+  console.log(`Change events: ${changeEvents.length} total (${changedSlugs.size} changed, ${deletedSlugs.size} deleted, ${impact.allAffected.size - changedSlugs.size - deletedSlugs.size} affected)`)
 
   const filteredContent = filterContent(ctx, allParsedFiles)
 
@@ -467,34 +704,24 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
 
   console.log(`Emitted ${emittedFiles} files in ${perf.timeSince("emit")}`)
 
-  // 更新缓存清单
+  // 更新缓存清单（更新 entity 节点的 mtime）
   for (const [_tree, file] of parsedFiles) {
+    const slug = file.data.slug!
     const fp = joinSegments(argv.directory, file.data.relativePath!) as FilePath
+    
     try {
       const stats = await stat(fp)
-      cacheManifest.files[fp] = {
-        mtime: stats.mtimeMs,
-        // slug: file.data.slug,
-        // links: file.data.links || [],
-        metadata: {
-          slug: file.data.slug!,
-          title: file.data.title as string,
-          links: file.data.links || [],
-          tags: Array.isArray(file.data.tags) ? file.data.tags : [],
-          frontmatter: file.data.frontmatter || {},
-          description: file.data.description,
-          relativePath: file.data.relativePath,
-        },
+      // 直接更新图谱节点的 mtime
+      if (cacheManifest.graph.nodes[slug]) {
+        cacheManifest.graph.nodes[slug].mtime = stats.mtimeMs
       }
     } catch (err) {
-      console.error(`Failed to cache ${fp}:`, err)
+      console.error(`Failed to update mtime for ${fp}:`, err)
     }
   }
 
-  // 从缓存中移除删除的文件
-  for (const deletedPath of deletedFilePaths) {
-    delete cacheManifest.files[deletedPath]
-  }
+  // 从缓存中移除删除的文件（已经在 updateGraphCache 中处理）
+  // 无需额外操作，因为节点已经被删除或转为 virtual
 
   // 删除对应的输出文件
   for (const deletedPath of deletedFilePaths) {
@@ -511,7 +738,6 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
 
   // 保存缓存
   await saveCacheManifest(output, cacheManifest)
-  await emitContent(ctx, filteredContent)
   console.log(styleText("green", `Done incremental build in ${perf.timeSince()}`))
   // release()
 

@@ -27,15 +27,24 @@ export type BuildTimeTrieData = QuartzPluginData & {
 // 新增
 
 // 在 ctx.ts 顶部添加类型定义
+type NodeType = "entity" | "virtual" | "tag"
+type EdgeType = "link" | "tag" | "backlink"
+
 export type GraphNode = {
   slug: string
+  type: NodeType
   title: string
   tags: string[]
+  filePath?: string
+  mtime?: number
+  description?: string
+  frontmatter?: Record<string, any>
 }
  
 export type GraphEdge = {
   source: string
   target: string
+  type: EdgeType
 }
  
 export type GraphCache = {
