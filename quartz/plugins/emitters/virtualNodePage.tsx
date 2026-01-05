@@ -174,5 +174,39 @@ export const VirtualNodePage: QuartzEmitterPlugin = () => {
         yield processVirtualNodePage(ctx, nodeName, backlinks, allFiles, opts, resources)
       }
     },
+    // 新增：增量构建支持
+    async *partialEmit(ctx, content, resources, changeEvents) {
+      const allFiles = content.map((c) => c[1].data)
+      
+      // 计算所有虚拟节点
+      const virtualNodes = computeVirtualNodes(ctx, allFiles)
+      
+      // 找出受影响的虚拟节点
+      const affectedVirtualNodes: Set<string> = new Set()
+      
+      for (const changeEvent of changeEvents) {
+        if (!changeEvent.file) continue
+        const slug = changeEvent.file.data.slug!
+        
+        // 如果是虚拟节点本身的变化（被新建或删除）
+        if (virtualNodes.has(slug)) {
+          affectedVirtualNodes.add(slug)
+        }
+        
+        // 如果变化的文件链接到某个虚拟节点，该虚拟节点需要更新
+        const links = changeEvent.file.data.links || []
+        for (const link of links) {
+          if (virtualNodes.has(link)) {
+            affectedVirtualNodes.add(link)
+          }
+        }
+      }
+      
+      // 只重新生成受影响的虚拟节点页面
+      for (const nodeName of affectedVirtualNodes) {
+        const backlinks = computeBacklinks(nodeName, ctx.graphCache, allFiles)
+        yield processVirtualNodePage(ctx, nodeName, backlinks, allFiles, opts, resources)
+      }
+    },
   }
 }

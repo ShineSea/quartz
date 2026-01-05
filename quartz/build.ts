@@ -212,6 +212,16 @@ function updateGraphCache(
     const links = file.data.links || []
     const tags = Array.isArray(file.data.tags) ? file.data.tags : []
 
+    // 检查是否是从 virtual 转换为 entity
+    const existingNode = graphCache.nodes[slug]
+    const isVirtualToEntity = existingNode && existingNode.type === "virtual"
+    
+    if (isVirtualToEntity) {
+      console.log(`Converting virtual node to entity: ${slug}`)
+      // 虚拟节点转为实体节点
+      // 保留 incoming edges（它们已经在 edges 中，无需特殊处理）
+    }
+
     // 更新/创建 entity 节点
     graphCache.nodes[slug] = {
       slug,
@@ -225,6 +235,7 @@ function updateGraphCache(
     }
 
     // 删除这个节点的旧边（outgoing edges）
+    // 注意：incoming edges 会被保留，因为只删除 source === slug 的边
     graphCache.edges = graphCache.edges.filter(
       (edge) => edge.source !== slug || edge.type !== "link"
     )
@@ -245,6 +256,10 @@ function updateGraphCache(
           title: target,
           tags: [],
         }
+      } else if (graphCache.nodes[target].type === "entity") {
+        // 目标节点已经是实体节点，无需操作
+      } else if (graphCache.nodes[target].type === "virtual") {
+        // 目标节点仍然是虚拟节点，保持不变
       }
     }
 
@@ -662,6 +677,30 @@ async function buildQuartzIncremental(argv: Argv, mut: Mutex, clientRefresh: () 
         type: "change" as const,
         path: tagPath,
         file: undefined,  // 标签页由 tagPage emitter 生成，不需要 file
+      })
+    } else if (node.type === "virtual") {
+      // 虚拟节点：为其创建 changeEvent，通知 VirtualNodePage emitter
+      const links = cacheManifest.graph.edges
+        .filter(edge => edge.source === slug && edge.type === "link")
+        .map(edge => edge.target as SimpleSlug)
+      
+      const virtualFile = defaultProcessedContent({
+        slug: slug as FullSlug,
+        relativePath: `${slug}.md` as FilePath,
+        filePath: `${slug}.md` as FilePath,
+        links: links,
+        tags: [],
+        title: node.title || slug,
+        description: undefined,
+        frontmatter: {
+          title: node.title || slug,
+        },
+      })
+      
+      changeEvents.push({
+        type: "change" as const,
+        path: `${slug}.md` as FilePath,
+        file: virtualFile[1],
       })
     }
   }
